@@ -14,7 +14,7 @@ body {
 .employee-2 { background-color:#f59e0b; color:white; }
 .employee-3 { background-color:#3b82f6; color:white; }
 .employee-4 { background-color:#ef4444; color:white; }
-.today-highlight { box-shadow: inset 0 0 0 3px #8b5cf6; }
+.today-highlight { box-shadow: inset 0 0 0 4px #000000; }
 .modal-overlay { background-color:rgba(0,0,0,.5); backdrop-filter:blur(4px); }
 </style>
 </head>
@@ -131,15 +131,15 @@ function autoFillMonth(){
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month+1, 0).getDate();
-    
+
     // بداية التناوب من أغسطس 2026
     const startDate = new Date(2026, 7, 1);
-    
+
     for(let day = 1; day <= daysInMonth; day++){
         const currentDay = new Date(year, month, day);
         let employee = null;
         const dayOfWeek = currentDay.getDay();
-        
+
         // السبت = زكريا
         if(dayOfWeek === 6){
             employee = 1;
@@ -192,7 +192,7 @@ function autoFillMonth(){
             else if(mod === 3) employee = 1; // زكريا
             else employee = 3;               // محمد
         }
-        
+
         if(employee){
             const key = `${year}-${month+1}-${day}`;
             // لا يغير التعديل اليدوي
@@ -208,35 +208,51 @@ function renderCalendar(){
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     document.getElementById('currentMonth').textContent = `${arabicMonths[month]} ${year}`;
-    
+
     autoFillMonth();
-    
+
     const grid = document.getElementById('calendarGrid');
     grid.innerHTML = '';
-    
+
     const firstDay = (new Date(year, month, 1).getDay() + 1) % 7;
     const days = new Date(year, month+1, 0).getDate();
-    
+
+    // تحديد اليوم الحالي للتمييز
+    const today = new Date();
+    const isCurrentMonth = (today.getFullYear() === year && today.getMonth() === month);
+
     for(let i = 0; i < firstDay; i++){
         let empty = document.createElement('div');
         empty.className = 'bg-gray-50 min-h-[90px]';
         grid.appendChild(empty);
     }
-    
+
     for(let day = 1; day <= days; day++){
         const key = `${year}-${month+1}-${day}`;
         const empId = shifts[key];
         const employee = employees.find(e => e.id === empId);
-        
+
+        let cellClasses = 'min-h-[90px] p-2 cursor-pointer ';
+        if(employee) {
+            cellClasses += employee.color + ' ';
+        } else {
+            cellClasses += 'bg-white ';
+        }
+
+        // تمييز اليوم الحالي بإطار أسود سميك
+        if(isCurrentMonth && day === today.getDate()) {
+            cellClasses += 'today-highlight ';
+        }
+
         let cell = document.createElement('div');
-        cell.className = `min-h-[90px] p-2 cursor-pointer ${employee ? employee.color : 'bg-white'}`;
+        cell.className = cellClasses;
         cell.onclick = () => openModal(day);
-        
+
         let number = document.createElement('div');
         number.className = employee ? 'text-white font-bold' : 'font-bold text-gray-800';
         number.textContent = day;
         cell.appendChild(number);
-        
+
         if(employee){
             let name = document.createElement('div');
             // حجم كبير لاسم المذيع
@@ -244,7 +260,7 @@ function renderCalendar(){
             name.textContent = employee.name;
             cell.appendChild(name);
         }
-        
+
         grid.appendChild(cell);
     }
 }
@@ -304,16 +320,22 @@ function renderStats(){
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     document.getElementById('statsMonth').textContent = `إحصائيات شهر ${arabicMonths[month]} ${year}`;
-    
+
     let counts = {};
     employees.forEach(e => counts[e.id] = 0);
-    Object.values(shifts).forEach(id => {
-        if(counts[id] != undefined) counts[id]++;
+
+    // حساب الورديات للشهر الحالي فقط
+    const prefix = `${year}-${month+1}-`;
+    Object.entries(shifts).forEach(([key, id]) => {
+        if(key.startsWith(prefix) && counts[id] !== undefined) {
+            counts[id]++;
+        }
     });
-    
+
     document.getElementById('statsContainer').innerHTML = employees.map(e => `
-        <div class="p-4 rounded-lg ${e.color} text-white">
-            ${e.name} : ${counts[e.id]} وردية
+        <div class="p-4 rounded-lg ${e.color} text-white flex justify-between items-center">
+            <span class="font-bold text-lg">${e.name}</span>
+            <span class="text-2xl font-bold">${counts[e.id]} وردية</span>
         </div>
     `).join('');
 }
