@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>جدول الورديات</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+body {
+    font-family: 'Tajawal', sans-serif;
+}
+.employee-1 { background-color:#22c55e; color:white; }
+.employee-2 { background-color:#f59e0b; color:white; }
+.employee-3 { background-color:#3b82f6; color:white; }
+.employee-4 { background-color:#ef4444; color:white; }
+.today-highlight { box-shadow: inset 0 0 0 3px #8b5cf6; }
+.modal-overlay { background-color:rgba(0,0,0,.5); backdrop-filter:blur(4px); }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg sticky top-0 z-40">
+<div class="container mx-auto px-4 py-4">
+<div class="flex justify-between items-center">
+<h1 class="text-xl font-bold">📅 جدول ورديات مذيعي قناة اليمن اليوم</h1>
+<div class="flex gap-2">
+<button onclick="showPage('calendar')" class="nav-btn px-3 py-2 rounded-lg hover:bg-white/20" data-page="calendar">التقويم</button>
+<button onclick="showPage('stats')" class="nav-btn px-3 py-2 rounded-lg hover:bg-white/20" data-page="stats">الإحصائيات</button>
+<button onclick="showPage('settings')" class="nav-btn px-3 py-2 rounded-lg hover:bg-white/20" data-page="settings">⚙️</button>
+</div>
+</div>
+</div>
+</nav>
+
+<div id="calendarPage" class="page container mx-auto px-4 py-6">
+<div class="flex justify-between items-center mb-6 bg-white rounded-xl shadow-md p-4">
+<button onclick="previousMonth()" class="bg-blue-500 text-white px-4 py-2 rounded-lg">السابق</button>
+<h2 id="currentMonth" class="text-xl font-bold"></h2>
+<button onclick="nextMonth()" class="bg-blue-500 text-white px-4 py-2 rounded-lg">التالي</button>
+</div>
+<div class="bg-white rounded-xl shadow-md overflow-hidden">
+<div class="grid grid-cols-7 bg-gray-800 text-white">
+<div class="p-3 text-center font-bold">السبت</div>
+<div class="p-3 text-center font-bold">الأحد</div>
+<div class="p-3 text-center font-bold">الإثنين</div>
+<div class="p-3 text-center font-bold">الثلاثاء</div>
+<div class="p-3 text-center font-bold">الأربعاء</div>
+<div class="p-3 text-center font-bold">الخميس</div>
+<div class="p-3 text-center font-bold">الجمعة</div>
+</div>
+<div id="calendarGrid" class="grid grid-cols-7 gap-px bg-gray-200"></div>
+</div>
+<div class="mt-6 bg-white rounded-xl shadow-md p-4">
+<h3 class="font-bold mb-3">دليل الألوان</h3>
+<div id="legendContainer" class="flex flex-wrap gap-3"></div>
+</div>
+</div>
+
+<div id="statsPage" class="page hidden container mx-auto px-4 py-6">
+<div class="bg-white rounded-xl shadow-md p-6">
+<h2 class="text-2xl font-bold mb-6">📊 إحصائيات الورديات</h2>
+<p id="statsMonth"></p>
+<div id="statsContainer" class="space-y-4"></div>
+</div>
+</div>
+
+<div id="settingsPage" class="page hidden container mx-auto px-4 py-6">
+<div class="bg-white rounded-xl shadow-md p-6">
+<h2 class="text-2xl font-bold mb-6">⚙️ إعدادات الموظفين</h2>
+<div id="settingsContainer" class="space-y-4"></div>
+<button onclick="saveSettings()" class="mt-6 w-full bg-green-500 text-white py-3 rounded-lg">حفظ التغييرات</button>
+</div>
+</div>
+
+<div id="employeeModal" class="fixed inset-0 z-50 hidden">
+<div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 w-80">
+<h3 class="text-xl font-bold mb-4">اختر الموظف</h3>
+<p id="selectedDateText" class="mb-4 text-gray-600"></p>
+<div id="employeeOptions" class="space-y-2"></div>
+<div class="mt-4 flex gap-2">
+<button onclick="clearAssignment()" class="flex-1 bg-red-500 text-white py-2 rounded-lg">حذف</button>
+<button onclick="closeModal()" class="flex-1 bg-gray-300 py-2 rounded-lg">إلغاء</button>
+</div>
+</div>
+</div>
+
+<script>
+const defaultEmployees = [
+    { id: 1, name: 'زكريا', color: 'employee-1' },
+    { id: 2, name: 'منصور', color: 'employee-2' },
+    { id: 3, name: 'محمد', color: 'employee-3' },
+    { id: 4, name: 'نورا', color: 'employee-4' }
+];
+
+let currentDate = new Date();
+let selectedDay = null;
+let employees = JSON.parse(localStorage.getItem('employees')) || [...defaultEmployees];
+let shifts = JSON.parse(localStorage.getItem('shifts')) || {};
+
+const arabicMonths = [
+'يناير','فبراير','مارس','أبريل','مايو','يونيو',
+'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'
+];
+
+document.addEventListener('DOMContentLoaded',()=>{
+    renderCalendar();
+    renderLegend();
+    renderSettings();
+});
+
+function showPage(page){
+    document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+    document.getElementById(page+'Page').classList.remove('hidden');
+    if(page==='stats') renderStats();
+}
+
+// ===============================
+// التناوب التلقائي
+// البداية: أغسطس 2026
+// السبت: زكريا
+// الأحد: منصور
+// الإثنين: محمد
+// الثلاثاء: نورا
+// الأربعاء: زكريا ثم نورا (تناوب)
+// الخميس: محمد ثم منصور (تناوب)
+// الجمعة: نورا → منصور → زكريا → محمد (تناوب)
+// ===============================
+
+function autoFillMonth(){
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    
+    // بداية التناوب من أغسطس 2026
+    const startDate = new Date(2026, 7, 1);
+    
+    for(let day = 1; day <= daysInMonth; day++){
+        const currentDay = new Date(year, month, day);
+        let employee = null;
+        const dayOfWeek = currentDay.getDay();
+        
+        // السبت = زكريا
+        if(dayOfWeek === 6){
+            employee = 1;
+        }
+        // الأحد = منصور
+        else if(dayOfWeek === 0){
+            employee = 2;
+        }
+        // الإثنين = محمد
+        else if(dayOfWeek === 1){
+            employee = 3;
+        }
+        // الثلاثاء = نورا
+        else if(dayOfWeek === 2){
+            employee = 4;
+        }
+        // الأربعاء: تناوب زكريا ثم نورا
+        else if(dayOfWeek === 3){
+            let count = 0;
+            let temp = new Date(startDate);
+            while(temp <= currentDay){
+                if(temp.getDay() === 3) count++;
+                temp.setDate(temp.getDate() + 1);
+            }
+            // أول أربعاء زكريا، ثاني نورا
+            employee = (count % 2 === 1) ? 1 : 4;
+        }
+        // الخميس: تناوب محمد ثم منصور
+        else if(dayOfWeek === 4){
+            let count = 0;
+            let temp = new Date(startDate);
+            while(temp <= currentDay){
+                if(temp.getDay() === 4) count++;
+                temp.setDate(temp.getDate() + 1);
+            }
+            // أول خميس محمد، ثاني منصور
+            employee = (count % 2 === 1) ? 3 : 2;
+        }
+        // الجمعة: تناوب نورا → منصور → زكريا → محمد
+        else if(dayOfWeek === 5){
+            let count = 0;
+            let temp = new Date(startDate);
+            while(temp <= currentDay){
+                if(temp.getDay() === 5) count++;
+                temp.setDate(temp.getDate() + 1);
+            }
+            let mod = count % 4;
+            if(mod === 1) employee = 4;      // نورا
+            else if(mod === 2) employee = 2; // منصور
+            else if(mod === 3) employee = 1; // زكريا
+            else employee = 3;               // محمد
+        }
+        
+        if(employee){
+            const key = `${year}-${month+1}-${day}`;
+            // لا يغير التعديل اليدوي
+            if(!shifts[key]){
+                shifts[key] = employee;
+            }
+        }
+    }
+    saveShifts();
+}
+
+function renderCalendar(){
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('currentMonth').textContent = `${arabicMonths[month]} ${year}`;
+    
+    autoFillMonth();
+    
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+    
+    const firstDay = (new Date(year, month, 1).getDay() + 1) % 7;
+    const days = new Date(year, month+1, 0).getDate();
+    
+    for(let i = 0; i < firstDay; i++){
+        let empty = document.createElement('div');
+        empty.className = 'bg-gray-50 min-h-[90px]';
+        grid.appendChild(empty);
+    }
+    
+    for(let day = 1; day <= days; day++){
+        const key = `${year}-${month+1}-${day}`;
+        const empId = shifts[key];
+        const employee = employees.find(e => e.id === empId);
+        
+        let cell = document.createElement('div');
+        cell.className = `min-h-[90px] p-2 cursor-pointer ${employee ? employee.color : 'bg-white'}`;
+        cell.onclick = () => openModal(day);
+        
+        let number = document.createElement('div');
+        number.className = employee ? 'text-white font-bold' : 'font-bold text-gray-800';
+        number.textContent = day;
+        cell.appendChild(number);
+        
+        if(employee){
+            let name = document.createElement('div');
+            // حجم كبير لاسم المذيع
+            name.className = 'text-white mt-2 text-xl font-bold';
+            name.textContent = employee.name;
+            cell.appendChild(name);
+        }
+        
+        grid.appendChild(cell);
+    }
+}
+
+function renderLegend(){
+    document.getElementById('legendContainer').innerHTML = employees.map(e => `
+        <div class="flex items-center gap-2">
+            <div class="w-4 h-4 rounded ${e.color}"></div>
+            <span>${e.name}</span>
+        </div>
+    `).join('');
+}
+
+function previousMonth(){
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+}
+
+function nextMonth(){
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+}
+
+function openModal(day){
+    selectedDay = day;
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('selectedDateText').textContent = `${day} ${arabicMonths[month]} ${year}`;
+    document.getElementById('employeeOptions').innerHTML = employees.map(e => `
+        <button onclick="assignEmployee(${e.id})" class="w-full p-3 rounded-lg ${e.color}">${e.name}</button>
+    `).join('');
+    document.getElementById('employeeModal').classList.remove('hidden');
+}
+
+function closeModal(){
+    document.getElementById('employeeModal').classList.add('hidden');
+    selectedDay = null;
+}
+
+function assignEmployee(id){
+    const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
+    shifts[key] = id;
+    saveShifts();
+    renderCalendar();
+    closeModal();
+}
+
+function clearAssignment(){
+    const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
+    delete shifts[key];
+    saveShifts();
+    renderCalendar();
+    closeModal();
+}
+
+function renderStats(){
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('statsMonth').textContent = `إحصائيات شهر ${arabicMonths[month]} ${year}`;
+    
+    let counts = {};
+    employees.forEach(e => counts[e.id] = 0);
+    Object.values(shifts).forEach(id => {
+        if(counts[id] != undefined) counts[id]++;
+    });
+    
+    document.getElementById('statsContainer').innerHTML = employees.map(e => `
+        <div class="p-4 rounded-lg ${e.color} text-white">
+            ${e.name} : ${counts[e.id]} وردية
+        </div>
+    `).join('');
+}
+
+function renderSettings(){
+    document.getElementById('settingsContainer').innerHTML = employees.map((e,i) => `
+        <input id="emp${i}" value="${e.name}" class="w-full p-3 border rounded-lg">
+    `).join('');
+}
+
+function saveSettings(){
+    employees.forEach((e,i) => {
+        e.name = document.getElementById('emp'+i).value;
+    });
+    localStorage.setItem('employees', JSON.stringify(employees));
+    renderCalendar();
+    renderLegend();
+    alert('تم الحفظ');
+}
+
+function saveShifts(){
+    localStorage.setItem('shifts', JSON.stringify(shifts));
+}
+</script>
+</body>
+</html>
