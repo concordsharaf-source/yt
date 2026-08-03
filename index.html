@@ -4,26 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>جدول الورديات</title>
-<!-- Firebase v8 (compat mode) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 body { font-family: 'Tajawal', sans-serif; }
-
 .employee-1 { background-color:#22c55e; color:white; }
 .employee-2 { background-color:#f59e0b; color:white; }
 .employee-3 { background-color:#3b82f6; color:white; }
 .employee-4 { background-color:#ef4444; color:white; }
-
 .today-highlight { box-shadow: inset 0 0 0 4px #000000; }
 .modal-overlay { background-color:rgba(0,0,0,.5); backdrop-filter:blur(4px); }
-
 .mobile-day-view { display: none; min-height: 100vh; }
 .desktop-calendar { display: block; }
 .mobile-landscape-calendar { display: none; }
-
 @media (max-width: 768px) and (orientation: portrait) {
     .desktop-calendar { display: none; }
     .mobile-day-view { display: flex; }
@@ -34,21 +29,17 @@ body { font-family: 'Tajawal', sans-serif; }
     .mobile-day-view { display: none; }
     .mobile-landscape-calendar { display: block; }
 }
-
 .employee-bg-1 { background: linear-gradient(135deg, #14532d, #22c55e); }
 .employee-bg-2 { background: linear-gradient(135deg, #78350f, #f59e0b); }
 .employee-bg-3 { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
 .employee-bg-4 { background: linear-gradient(135deg, #7f1d1d, #ef4444); }
-
 .pulse-ring { animation: pulse-ring 2s infinite; }
 @keyframes pulse-ring {
     0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
     70% { box-shadow: 0 0 0 20px rgba(255,255,255,0); }
     100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
 }
-
 .friday-banner { background: linear-gradient(90deg, #f59e0b, #d97706); }
-
 .lock-icon { animation: shake 0.5s ease-in-out; }
 @keyframes shake {
     0%,100% { transform: rotate(0); }
@@ -59,14 +50,13 @@ body { font-family: 'Tajawal', sans-serif; }
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-<!-- ===== NAVBAR ===== -->
 <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg sticky top-0 z-40">
 <div class="container mx-auto px-3 py-2">
 <div class="flex justify-between items-center">
 <h1 class="hidden md:block text-base font-bold whitespace-nowrap">📅 جدول ورديات مذيعي قناة اليمن اليوم</h1>
 <h1 class="md:hidden text-sm font-bold whitespace-nowrap">📅 جدول الورديات</h1>
 <div class="flex gap-1 items-center">
-<div id="firebaseStatus" class="hidden mr-2 px-2 py-0.5 rounded text-[10px] bg-green-500/80">🟢 متصل</div>
+<div id="firebaseStatus" class="hidden mr-2 px-2 py-0.5 rounded text-[10px] bg-gray-500/80">⏳ جاري الاتصال...</div>
 <button onclick="showPage('calendar')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="calendar">التقويم</button>
 <button onclick="showPage('stats')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="stats">الإحصائيات</button>
 <button onclick="handleSettingsClick()" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="settings">⚙️</button>
@@ -76,10 +66,12 @@ body { font-family: 'Tajawal', sans-serif; }
 </div>
 </nav>
 
-<!-- ===== CALENDAR PAGE ===== -->
-<div id="calendarPage" class="page">
+<div id="firebaseError" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mx-4 mt-4 text-sm">
+<strong>خطأ في الاتصال بـ Firebase!</strong><br>
+<span id="errorText">تأكد من إنشاء Realtime Database ونشر الـ Rules.</span>
+</div>
 
-    <!-- Mobile Portrait: Today Card -->
+<div id="calendarPage" class="page">
     <div id="mobileDayView" class="mobile-day-view flex-col">
         <div id="dayCardContainer" class="flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen">
             <div id="employeeCard" class="absolute top-6 left-6 bg-white/20 backdrop-blur-md rounded-3xl p-4 border border-white/30 shadow-2xl">
@@ -101,7 +93,6 @@ body { font-family: 'Tajawal', sans-serif; }
         </div>
     </div>
 
-    <!-- Desktop Calendar -->
     <div class="desktop-calendar container mx-auto px-4 py-6">
         <div class="flex justify-between items-center mb-6 bg-white rounded-xl shadow-md p-4">
             <button onclick="previousMonth()" class="bg-blue-500 text-white px-4 py-2 rounded-lg">السابق</button>
@@ -126,7 +117,6 @@ body { font-family: 'Tajawal', sans-serif; }
         </div>
     </div>
 
-    <!-- Mobile Landscape Calendar -->
     <div class="mobile-landscape-calendar container mx-auto px-4 py-6">
         <div class="flex justify-between items-center mb-4 bg-white rounded-xl shadow-md p-3">
             <button onclick="previousMonth()" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm">السابق</button>
@@ -146,10 +136,8 @@ body { font-family: 'Tajawal', sans-serif; }
             <div id="calendarGridLandscape" class="grid grid-cols-7 gap-px bg-gray-200"></div>
         </div>
     </div>
-
 </div>
 
-<!-- ===== STATS PAGE ===== -->
 <div id="statsPage" class="page hidden container mx-auto px-4 py-6">
 <div class="bg-white rounded-xl shadow-md p-6">
 <h2 class="text-2xl font-bold mb-6">📊 إحصائيات الورديات</h2>
@@ -158,7 +146,6 @@ body { font-family: 'Tajawal', sans-serif; }
 </div>
 </div>
 
-<!-- ===== SETTINGS PAGE ===== -->
 <div id="settingsPage" class="page hidden container mx-auto px-4 py-6">
 <div class="bg-white rounded-xl shadow-md p-6">
 <h2 class="text-2xl font-bold mb-6">⚙️ إعدادات الموظفين</h2>
@@ -167,7 +154,6 @@ body { font-family: 'Tajawal', sans-serif; }
 </div>
 </div>
 
-<!-- ===== EMPLOYEE MODAL ===== -->
 <div id="employeeModal" class="fixed inset-0 z-50 hidden">
 <div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
 <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 w-80">
@@ -181,7 +167,6 @@ body { font-family: 'Tajawal', sans-serif; }
 </div>
 </div>
 
-<!-- ===== PASSWORD MODAL ===== -->
 <div id="passwordModal" class="fixed inset-0 z-50 hidden">
 <div class="modal-overlay absolute inset-0" onclick="closePasswordModal()"></div>
 <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 w-80">
@@ -196,26 +181,33 @@ body { font-family: 'Tajawal', sans-serif; }
 </div>
 
 <script>
-// ==========================================
-// FIREBASE CONFIG — بيانات مشروعك
-// ==========================================
+// ===== FIREBASE CONFIG — القيم الصحيحة من مشروعك =====
 const firebaseConfig = {
   apiKey: "AIzaSyCHd1yY27vSskKuvvNZ_XmtwgoHc3lPe5k",
   authDomain: "ytcalender-bae88.firebaseapp.com",
-  databaseURL: "https://ytcalender-bae88-default-rtdb.firebaseio.com",
+  databaseURL: "https://ytcalender-bae88-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "ytcalender-bae88",
-  storageBucket: "ytcalender-bae88.appspot.com",
+  storageBucket: "ytcalender-bae88.firebasestorage.app",
   messagingSenderId: "625139846676",
   appId: "1:625139846676:web:691be456f3f31e6572e101"
 };
 
-// Initialize Firebase (v8 compat mode)
-firebase.initializeApp(firebaseConfig);
+// Check protocol
+if (window.location.protocol === 'file:') {
+    console.warn('⚠️ الملف يُفتح محلياً. Firebase قد لا يعمل. ارفع الملف على استضافة.');
+}
+
+// Initialize Firebase
+try {
+    firebase.initializeApp(firebaseConfig);
+    console.log('✅ Firebase initialized');
+} catch(e) {
+    console.error('❌ Firebase init error:', e);
+    showFirebaseError('خطأ في تهيئة Firebase: ' + e.message);
+}
+
 const db = firebase.database();
 
-// ==========================================
-// ADMIN PASSWORD
-// ==========================================
 const ADMIN_PASSWORD = "yemen2026";
 let isAdmin = false;
 
@@ -236,69 +228,78 @@ const arabicMonths = [
 'يناير','فبراير','مارس','أبريل','مايو','يونيو',
 'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'
 ];
-
 const arabicDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
-// ==========================================
-// FIREBASE LISTENERS (Realtime)
-// ==========================================
-// Listen to shifts
+// ===== FIREBASE LISTENERS =====
 db.ref('shifts').on('value', (snapshot) => {
     const data = snapshot.val();
+    console.log('📥 Shifts received:', data);
     shifts = data || {};
     firebaseReady = true;
-    document.getElementById('firebaseStatus').classList.remove('hidden');
+    updateStatus(true);
     renderCalendar();
     renderLandscapeCalendar();
     renderMobileDayView();
+}, (error) => {
+    console.error('❌ Shifts error:', error.code, error.message);
+    showFirebaseError('خطأ: ' + error.message + '. تأكد من Rules.');
+    updateStatus(false);
 });
 
-// Listen to employees
 db.ref('employees').on('value', (snapshot) => {
     const data = snapshot.val();
+    console.log('📥 Employees received:', data);
     if (data !== null && Array.isArray(data) && data.length > 0) {
         employees = data;
     }
     renderLegend();
     renderSettings();
+}, (error) => {
+    console.error('❌ Employees error:', error);
 });
 
 // Connection status
 db.ref('.info/connected').on('value', (snap) => {
+    const connected = snap.val() === true;
+    console.log('🌐 Connected:', connected);
+    updateStatus(connected);
+});
+
+function updateStatus(connected) {
     const status = document.getElementById('firebaseStatus');
-    if (snap.val() === true) {
+    status.classList.remove('hidden');
+    if (connected) {
         status.textContent = '🟢 متصل';
         status.className = 'mr-2 px-2 py-0.5 rounded text-[10px] bg-green-500/80 text-white';
+        document.getElementById('firebaseError').classList.add('hidden');
     } else {
         status.textContent = '🔴 غير متصل';
         status.className = 'mr-2 px-2 py-0.5 rounded text-[10px] bg-red-500/80 text-white';
     }
-    status.classList.remove('hidden');
-});
+}
 
-// ==========================================
-// ADMIN FUNCTIONS
-// ==========================================
+function showFirebaseError(msg) {
+    document.getElementById('errorText').textContent = msg;
+    document.getElementById('firebaseError').classList.remove('hidden');
+}
+
+// ===== ADMIN =====
 function handleSettingsClick() {
     if (isAdmin) { showPage('settings'); }
     else { openPasswordModal('settings'); }
 }
-
 function openPasswordModal(target) {
     document.getElementById('passwordModal').classList.remove('hidden');
     document.getElementById('passwordInput').value = '';
     document.getElementById('passwordInput').dataset.target = target;
     setTimeout(() => document.getElementById('passwordInput').focus(), 100);
 }
-
 function closePasswordModal() {
     document.getElementById('passwordModal').classList.add('hidden');
 }
-
 function verifyPassword() {
     const input = document.getElementById('passwordInput').value;
     const target = document.getElementById('passwordInput').dataset.target;
-
     if (input === ADMIN_PASSWORD) {
         isAdmin = true;
         closePasswordModal();
@@ -311,23 +312,19 @@ function verifyPassword() {
         document.getElementById('passwordInput').focus();
     }
 }
-
 function logoutAdmin() {
     isAdmin = false;
     updateAdminUI();
     showPage('calendar');
     showToast('تم تسجيل الخروج', 'success');
 }
-
 function updateAdminUI() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (isAdmin) { logoutBtn.classList.remove('hidden'); }
     else { logoutBtn.classList.add('hidden'); }
 }
 
-// ==========================================
-// PAGE NAVIGATION
-// ==========================================
+// ===== PAGES =====
 function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
     document.getElementById(page + 'Page').classList.remove('hidden');
@@ -339,21 +336,16 @@ function showPage(page) {
     }
 }
 
-// ==========================================
-// SHIFT LOGIC
-// ==========================================
+// ===== SHIFT LOGIC =====
 function getEmployeeForDate(date) {
     const startDate = new Date(2026, 7, 1);
     const currentDay = new Date(date);
     const dayOfWeek = currentDay.getDay();
     const key = `${currentDay.getFullYear()}-${currentDay.getMonth()+1}-${currentDay.getDate()}`;
-
     if (shifts[key]) {
         return employees.find(e => e.id === shifts[key]) || null;
     }
-
     let employeeId = null;
-
     if (dayOfWeek === 6) { employeeId = 1; }
     else if (dayOfWeek === 0) { employeeId = 2; }
     else if (dayOfWeek === 1) { employeeId = 3; }
@@ -389,10 +381,8 @@ function getEmployeeForDate(date) {
         else if (mod === 3) employeeId = 1;
         else employeeId = 3;
     }
-
     return employees.find(e => e.id === employeeId) || null;
 }
-
 function getNextFriday(date) {
     const d = new Date(date);
     const day = d.getDay();
@@ -402,29 +392,23 @@ function getNextFriday(date) {
     return d;
 }
 
-// ==========================================
-// RENDER FUNCTIONS
-// ==========================================
+// ===== RENDER =====
 function renderMobileDayView() {
     const container = document.getElementById('mobileDayView');
     if (!container) return;
-
     const today = new Date();
     const employee = getEmployeeForDate(today);
     const dayNum = today.getDate();
     const monthName = arabicMonths[today.getMonth()];
     const year = today.getFullYear();
     const dayName = arabicDays[today.getDay()];
-
     document.getElementById('dayNumber').textContent = dayNum;
     document.getElementById('dayMonth').textContent = monthName + ' ' + year;
     document.getElementById('dayName').textContent = dayName;
-
     const badge = document.getElementById('employeeBadge');
     const cardContainer = document.getElementById('dayCardContainer');
     const avatar = document.getElementById('employeeAvatar');
     const cardName = document.getElementById('employeeCardName');
-
     if (employee) {
         badge.textContent = employee.name;
         badge.className = `inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring ${employee.color}`;
@@ -439,11 +423,9 @@ function renderMobileDayView() {
         cardContainer.className = 'flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen day-card-bg';
         document.getElementById('employeeCard').style.display = 'none';
     }
-
     const nextFriday = getNextFriday(today);
     const nextFridayEmployee = getEmployeeForDate(nextFriday);
     const noteDiv = document.getElementById('nextFridayNote');
-
     if (today.getDay() === 5) {
         if (nextFridayEmployee) {
             document.getElementById('nextFridayText').textContent = 
@@ -461,12 +443,10 @@ function autoFillMonth() {
     const daysInMonth = new Date(year, month+1, 0).getDate();
     const startDate = new Date(2026, 7, 1);
     let changed = false;
-
     for (let day = 1; day <= daysInMonth; day++) {
         const currentDay = new Date(year, month, day);
         let employee = null;
         const dayOfWeek = currentDay.getDay();
-
         if (dayOfWeek === 6) { employee = 1; }
         else if (dayOfWeek === 0) { employee = 2; }
         else if (dayOfWeek === 1) { employee = 3; }
@@ -502,7 +482,6 @@ function autoFillMonth() {
             else if (mod === 3) employee = 1;
             else employee = 3;
         }
-
         if (employee) {
             const key = `${year}-${month+1}-${day}`;
             if (!shifts[key]) {
@@ -512,7 +491,7 @@ function autoFillMonth() {
         }
     }
     if (changed && firebaseReady) {
-        db.ref('shifts').set(shifts);
+        db.ref('shifts').set(shifts).catch(e => console.error('Write error:', e));
     }
 }
 
@@ -521,56 +500,40 @@ function renderCalendar() {
     const month = currentDate.getMonth();
     const el = document.getElementById('currentMonth');
     if (el) el.textContent = `${arabicMonths[month]} ${year}`;
-
     autoFillMonth();
-
     const grid = document.getElementById('calendarGrid');
     if (!grid) return;
     grid.innerHTML = '';
-
     const firstDay = (new Date(year, month, 1).getDay() + 1) % 7;
     const days = new Date(year, month+1, 0).getDate();
     const today = new Date();
     const isCurrentMonth = (today.getFullYear() === year && today.getMonth() === month);
-
     for (let i = 0; i < firstDay; i++) {
         let empty = document.createElement('div');
         empty.className = 'bg-gray-50 min-h-[90px]';
         grid.appendChild(empty);
     }
-
     for (let day = 1; day <= days; day++) {
         const key = `${year}-${month+1}-${day}`;
         const empId = shifts[key];
         const employee = employees.find(e => e.id === empId);
-
         let cellClasses = 'min-h-[90px] p-2 cursor-pointer ';
-        if (employee) {
-            cellClasses += employee.color + ' ';
-        } else {
-            cellClasses += 'bg-white ';
-        }
-
-        if (isCurrentMonth && day === today.getDate()) {
-            cellClasses += 'today-highlight ';
-        }
-
+        if (employee) { cellClasses += employee.color + ' '; }
+        else { cellClasses += 'bg-white '; }
+        if (isCurrentMonth && day === today.getDate()) { cellClasses += 'today-highlight '; }
         let cell = document.createElement('div');
         cell.className = cellClasses;
         cell.onclick = () => handleCellClick(day);
-
         let number = document.createElement('div');
         number.className = employee ? 'text-white font-bold' : 'font-bold text-gray-800';
         number.textContent = day;
         cell.appendChild(number);
-
         if (employee) {
             let name = document.createElement('div');
             name.className = 'text-white mt-2 text-xl font-bold';
             name.textContent = employee.name;
             cell.appendChild(name);
         }
-
         grid.appendChild(cell);
     }
 }
@@ -580,56 +543,40 @@ function renderLandscapeCalendar() {
     const month = currentDate.getMonth();
     const el = document.getElementById('currentMonthLandscape');
     if (el) el.textContent = `${arabicMonths[month]} ${year}`;
-
     autoFillMonth();
-
     const grid = document.getElementById('calendarGridLandscape');
     if (!grid) return;
     grid.innerHTML = '';
-
     const firstDay = (new Date(year, month, 1).getDay() + 1) % 7;
     const days = new Date(year, month+1, 0).getDate();
     const today = new Date();
     const isCurrentMonth = (today.getFullYear() === year && today.getMonth() === month);
-
     for (let i = 0; i < firstDay; i++) {
         let empty = document.createElement('div');
         empty.className = 'bg-gray-50 min-h-[60px]';
         grid.appendChild(empty);
     }
-
     for (let day = 1; day <= days; day++) {
         const key = `${year}-${month+1}-${day}`;
         const empId = shifts[key];
         const employee = employees.find(e => e.id === empId);
-
         let cellClasses = 'min-h-[60px] p-1 cursor-pointer ';
-        if (employee) {
-            cellClasses += employee.color + ' ';
-        } else {
-            cellClasses += 'bg-white ';
-        }
-
-        if (isCurrentMonth && day === today.getDate()) {
-            cellClasses += 'today-highlight ';
-        }
-
+        if (employee) { cellClasses += employee.color + ' '; }
+        else { cellClasses += 'bg-white '; }
+        if (isCurrentMonth && day === today.getDate()) { cellClasses += 'today-highlight '; }
         let cell = document.createElement('div');
         cell.className = cellClasses;
         cell.onclick = () => handleCellClick(day);
-
         let number = document.createElement('div');
         number.className = employee ? 'text-white font-bold text-xs' : 'font-bold text-gray-800 text-xs';
         number.textContent = day;
         cell.appendChild(number);
-
         if (employee) {
             let name = document.createElement('div');
             name.className = 'text-white mt-1 text-sm font-bold';
             name.textContent = employee.name;
             cell.appendChild(name);
         }
-
         grid.appendChild(cell);
     }
 }
@@ -658,7 +605,6 @@ function previousMonth() {
     renderCalendar();
     renderLandscapeCalendar();
 }
-
 function nextMonth() {
     currentDate.setMonth(currentDate.getMonth() + 1);
     renderCalendar();
@@ -675,7 +621,6 @@ function openModal(day) {
     `).join('');
     document.getElementById('employeeModal').classList.remove('hidden');
 }
-
 function closeModal() {
     document.getElementById('employeeModal').classList.add('hidden');
     selectedDay = null;
@@ -690,7 +635,7 @@ function assignEmployee(id) {
     }
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
     shifts[key] = id;
-    db.ref('shifts').set(shifts);
+    db.ref('shifts').set(shifts).catch(e => console.error('Write error:', e));
     renderCalendar();
     renderLandscapeCalendar();
     renderMobileDayView();
@@ -707,7 +652,7 @@ function clearAssignment() {
     }
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
     delete shifts[key];
-    db.ref('shifts').set(shifts);
+    db.ref('shifts').set(shifts).catch(e => console.error('Write error:', e));
     renderCalendar();
     renderLandscapeCalendar();
     renderMobileDayView();
@@ -720,17 +665,12 @@ function renderStats() {
     const month = currentDate.getMonth();
     const el = document.getElementById('statsMonth');
     if (el) el.textContent = `إحصائيات شهر ${arabicMonths[month]} ${year}`;
-
     let counts = {};
     employees.forEach(e => counts[e.id] = 0);
-
     const prefix = `${year}-${month+1}-`;
     Object.entries(shifts).forEach(([key, id]) => {
-        if (key.startsWith(prefix) && counts[id] !== undefined) {
-            counts[id]++;
-        }
+        if (key.startsWith(prefix) && counts[id] !== undefined) { counts[id]++; }
     });
-
     const container = document.getElementById('statsContainer');
     if (container) container.innerHTML = employees.map(e => `
         <div class="p-4 rounded-lg ${e.color} text-white flex justify-between items-center">
@@ -748,14 +688,9 @@ function renderSettings() {
 }
 
 function saveSettings() {
-    if (!isAdmin) {
-        showToast('يجب تسجيل الدخول أولاً', 'error');
-        return;
-    }
-    employees.forEach((e, i) => {
-        e.name = document.getElementById('emp' + i).value;
-    });
-    db.ref('employees').set(employees);
+    if (!isAdmin) { showToast('يجب تسجيل الدخول أولاً', 'error'); return; }
+    employees.forEach((e, i) => { e.name = document.getElementById('emp' + i).value; });
+    db.ref('employees').set(employees).catch(e => console.error('Write error:', e));
     renderCalendar();
     renderLandscapeCalendar();
     renderLegend();
@@ -763,13 +698,9 @@ function saveSettings() {
     showToast('تم الحفظ', 'success');
 }
 
-// ==========================================
-// TOAST
-// ==========================================
 function showToast(message, type='success') {
     const existing = document.getElementById('toast');
     if (existing) existing.remove();
-
     const toast = document.createElement('div');
     toast.id = 'toast';
     toast.className = 'fixed bottom-6 right-6 transform transition-all duration-300 z-50';
@@ -780,12 +711,7 @@ function showToast(message, type='success') {
         </div>
     `;
     document.body.appendChild(toast);
-
-    requestAnimationFrame(() => {
-        toast.style.transform = 'translateY(0)';
-        toast.style.opacity = '1';
-    });
-
+    requestAnimationFrame(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; });
     setTimeout(() => {
         toast.style.transform = 'translateY(20px)';
         toast.style.opacity = '0';
@@ -793,7 +719,6 @@ function showToast(message, type='success') {
     }, 3000);
 }
 
-// Enter key in password
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !document.getElementById('passwordModal').classList.contains('hidden')) {
         verifyPassword();
