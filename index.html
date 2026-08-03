@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>جدول ورديات مذيعي قناة اليمن اليوم</title>
+<title>جدول الورديات</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -54,21 +54,24 @@ body { font-family: 'Tajawal', sans-serif; }
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-<!-- ===== NAVBAR ===== -->
+<!-- ===== COMPACT NAVBAR ===== -->
 <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg sticky top-0 z-40">
-<div class="container mx-auto px-4 py-3">
+<div class="container mx-auto px-3 py-2">
 <div class="flex justify-between items-center">
-<h1 class="text-lg font-bold">📅 جدول ورديات مذيعي قناة اليمن اليوم</h1>
-<div class="flex gap-2">
-<button onclick="showPage('calendar')" class="nav-btn px-3 py-2 rounded-lg hover:bg-white/20 text-sm" data-page="calendar">التقويم</button>
-<button onclick="showPage('stats')" class="nav-btn px-3 py-2 rounded-lg hover:bg-white/20 text-sm" data-page="stats">الإحصائيات</button>
-<button onclick="showPage('settings')" class="nav-btn px-3 py-2 rounded-lg hover:bg-white/20 text-sm" data-page="settings">⚙️</button>
+<!-- Desktop title -->
+<h1 class="hidden md:block text-base font-bold whitespace-nowrap">📅 جدول ورديات مذيعي قناة اليمن اليوم</h1>
+<!-- Mobile title -->
+<h1 class="md:hidden text-sm font-bold whitespace-nowrap">📅 جدول الورديات</h1>
+<div class="flex gap-1">
+<button onclick="showPage('calendar')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="calendar">التقويم</button>
+<button onclick="showPage('stats')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="stats">الإحصائيات</button>
+<button onclick="showPage('settings')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="settings">⚙️</button>
 </div>
 </div>
 </div>
 </nav>
 
-<!-- ===== CALENDAR PAGE (contains all 3 views) ===== -->
+<!-- ===== CALENDAR PAGE ===== -->
 <div id="calendarPage" class="page">
 
     <!-- Mobile Portrait: Today Card -->
@@ -223,10 +226,6 @@ function showPage(page) {
     }
 }
 
-// ===============================
-// التناوب التلقائي
-// البداية: أغسطس 2026
-// ===============================
 function getEmployeeForDate(date) {
     const startDate = new Date(2026, 7, 1);
     const currentDay = new Date(date);
