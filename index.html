@@ -56,7 +56,6 @@ body { font-family: 'Tajawal', sans-serif; }
 <h1 class="hidden md:block text-base font-bold whitespace-nowrap">📅 جدول ورديات مذيعي قناة اليمن اليوم</h1>
 <h1 class="md:hidden text-sm font-bold whitespace-nowrap">📅 جدول الورديات</h1>
 <div class="flex gap-1 items-center">
-<div id="firebaseStatus" class="hidden mr-2 px-2 py-0.5 rounded text-[10px] bg-gray-500/80">⏳ جاري الاتصال...</div>
 <button onclick="showPage('calendar')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="calendar">التقويم</button>
 <button onclick="showPage('stats')" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="stats">الإحصائيات</button>
 <button onclick="handleSettingsClick()" class="nav-btn px-2.5 py-1.5 rounded-lg hover:bg-white/20 text-xs font-medium" data-page="settings">⚙️</button>
@@ -71,7 +70,9 @@ body { font-family: 'Tajawal', sans-serif; }
 <span id="errorText">تأكد من إنشاء Realtime Database ونشر الـ Rules.</span>
 </div>
 
+<!-- ===== CALENDAR PAGE ===== -->
 <div id="calendarPage" class="page">
+    <!-- Mobile Portrait: Today Card -->
     <div id="mobileDayView" class="mobile-day-view flex-col">
         <div id="dayCardContainer" class="flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen">
             <div id="employeeCard" class="absolute top-6 left-6 bg-white/20 backdrop-blur-md rounded-3xl p-4 border border-white/30 shadow-2xl">
@@ -83,6 +84,12 @@ body { font-family: 'Tajawal', sans-serif; }
                 <div id="dayMonth" class="text-3xl text-white/90 font-bold mb-4"></div>
                 <div id="dayName" class="text-2xl text-white/80 mb-10"></div>
                 <div id="employeeBadge" class="inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring"></div>
+            </div>
+            <!-- Connection status moved below image, centered -->
+            <div class="mt-8 text-center">
+                <div id="firebaseStatus" class="hidden inline-block px-3 py-1 rounded-full text-xs bg-white/20 backdrop-blur-md border border-white/30 text-white">
+                    ⏳ جاري الاتصال...
+                </div>
             </div>
             <div id="nextFridayNote" class="hidden absolute bottom-0 left-0 right-0 friday-banner text-white p-5 text-center">
                 <div class="flex items-center justify-center gap-3">
@@ -181,7 +188,7 @@ body { font-family: 'Tajawal', sans-serif; }
 </div>
 
 <script>
-// ===== FIREBASE CONFIG — القيم الصحيحة من مشروعك =====
+// ===== FIREBASE CONFIG =====
 const firebaseConfig = {
   apiKey: "AIzaSyCHd1yY27vSskKuvvNZ_XmtwgoHc3lPe5k",
   authDomain: "ytcalender-bae88.firebaseapp.com",
@@ -192,12 +199,10 @@ const firebaseConfig = {
   appId: "1:625139846676:web:691be456f3f31e6572e101"
 };
 
-// Check protocol
 if (window.location.protocol === 'file:') {
     console.warn('⚠️ الملف يُفتح محلياً. Firebase قد لا يعمل. ارفع الملف على استضافة.');
 }
 
-// Initialize Firebase
 try {
     firebase.initializeApp(firebaseConfig);
     console.log('✅ Firebase initialized');
@@ -270,12 +275,13 @@ function updateStatus(connected) {
     status.classList.remove('hidden');
     if (connected) {
         status.textContent = '🟢 متصل';
-        status.className = 'mr-2 px-2 py-0.5 rounded text-[10px] bg-green-500/80 text-white';
-        document.getElementById('firebaseError').classList.add('hidden');
+        status.className = 'hidden inline-block px-3 py-1 rounded-full text-xs bg-green-500/80 text-white border border-white/30';
     } else {
         status.textContent = '🔴 غير متصل';
-        status.className = 'mr-2 px-2 py-0.5 rounded text-[10px] bg-red-500/80 text-white';
+        status.className = 'hidden inline-block px-3 py-1 rounded-full text-xs bg-red-500/80 text-white border border-white/30';
     }
+    status.classList.remove('hidden');
+    document.getElementById('firebaseError').classList.add('hidden');
 }
 
 function showFirebaseError(msg) {
@@ -305,6 +311,11 @@ function verifyPassword() {
         closePasswordModal();
         updateAdminUI();
         if (target === 'settings') { showPage('settings'); }
+        // If there was a pending day click, open it now
+        if (window.pendingDay) {
+            openModal(window.pendingDay);
+            window.pendingDay = null;
+        }
         showToast('تم تسجيل الدخول كمسؤول', 'success');
     } else {
         showToast('كلمة المرور غير صحيحة', 'error');
@@ -328,6 +339,14 @@ function updateAdminUI() {
 function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
     document.getElementById(page + 'Page').classList.remove('hidden');
+    // Update nav button active state
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.dataset.page === page) {
+            btn.classList.add('bg-white/20');
+        } else {
+            btn.classList.remove('bg-white/20');
+        }
+    });
     if (page === 'stats') renderStats();
     if (page === 'calendar') {
         renderCalendar();
@@ -517,13 +536,18 @@ function renderCalendar() {
         const key = `${year}-${month+1}-${day}`;
         const empId = shifts[key];
         const employee = employees.find(e => e.id === empId);
-        let cellClasses = 'min-h-[90px] p-2 cursor-pointer ';
+        let cellClasses = 'min-h-[90px] p-2 ';
         if (employee) { cellClasses += employee.color + ' '; }
         else { cellClasses += 'bg-white '; }
         if (isCurrentMonth && day === today.getDate()) { cellClasses += 'today-highlight '; }
+        // Only add cursor-pointer if admin
+        if (isAdmin) { cellClasses += 'cursor-pointer '; }
         let cell = document.createElement('div');
         cell.className = cellClasses;
-        cell.onclick = () => handleCellClick(day);
+        // Only attach click handler if admin
+        if (isAdmin) {
+            cell.onclick = () => openModal(day);
+        }
         let number = document.createElement('div');
         number.className = employee ? 'text-white font-bold' : 'font-bold text-gray-800';
         number.textContent = day;
@@ -560,13 +584,18 @@ function renderLandscapeCalendar() {
         const key = `${year}-${month+1}-${day}`;
         const empId = shifts[key];
         const employee = employees.find(e => e.id === empId);
-        let cellClasses = 'min-h-[60px] p-1 cursor-pointer ';
+        let cellClasses = 'min-h-[60px] p-1 ';
         if (employee) { cellClasses += employee.color + ' '; }
         else { cellClasses += 'bg-white '; }
         if (isCurrentMonth && day === today.getDate()) { cellClasses += 'today-highlight '; }
+        // Only add cursor-pointer if admin
+        if (isAdmin) { cellClasses += 'cursor-pointer '; }
         let cell = document.createElement('div');
         cell.className = cellClasses;
-        cell.onclick = () => handleCellClick(day);
+        // Only attach click handler if admin
+        if (isAdmin) {
+            cell.onclick = () => openModal(day);
+        }
         let number = document.createElement('div');
         number.className = employee ? 'text-white font-bold text-xs' : 'font-bold text-gray-800 text-xs';
         number.textContent = day;
@@ -579,15 +608,6 @@ function renderLandscapeCalendar() {
         }
         grid.appendChild(cell);
     }
-}
-
-function handleCellClick(day) {
-    if (!isAdmin) {
-        openPasswordModal('edit');
-        window.pendingDay = day;
-        return;
-    }
-    openModal(day);
 }
 
 function renderLegend() {
@@ -627,12 +647,6 @@ function closeModal() {
 }
 
 function assignEmployee(id) {
-    if (!isAdmin) {
-        closeModal();
-        openPasswordModal('edit');
-        window.pendingDay = selectedDay;
-        return;
-    }
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
     shifts[key] = id;
     db.ref('shifts').set(shifts).catch(e => console.error('Write error:', e));
@@ -644,12 +658,6 @@ function assignEmployee(id) {
 }
 
 function clearAssignment() {
-    if (!isAdmin) {
-        closeModal();
-        openPasswordModal('edit');
-        window.pendingDay = selectedDay;
-        return;
-    }
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
     delete shifts[key];
     db.ref('shifts').set(shifts).catch(e => console.error('Write error:', e));
