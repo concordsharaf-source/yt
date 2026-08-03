@@ -72,7 +72,6 @@ body { font-family: 'Tajawal', sans-serif; }
 
 <!-- ===== CALENDAR PAGE ===== -->
 <div id="calendarPage" class="page">
-    <!-- Mobile Portrait: Today Card -->
     <div id="mobileDayView" class="mobile-day-view flex-col">
         <div id="dayCardContainer" class="flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen">
             <div id="employeeCard" class="absolute top-6 left-6 bg-white/20 backdrop-blur-md rounded-3xl p-4 border border-white/30 shadow-2xl">
@@ -85,7 +84,6 @@ body { font-family: 'Tajawal', sans-serif; }
                 <div id="dayName" class="text-2xl text-white/80 mb-10"></div>
                 <div id="employeeBadge" class="inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring"></div>
             </div>
-            <!-- Connection status moved below image, centered -->
             <div class="mt-8 text-center">
                 <div id="firebaseStatus" class="hidden inline-block px-3 py-1 rounded-full text-xs bg-white/20 backdrop-blur-md border border-white/30 text-white">
                     ⏳ جاري الاتصال...
@@ -235,6 +233,16 @@ const arabicMonths = [
 ];
 const arabicDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
+// ===== CHECK SAVED ADMIN SESSION =====
+function checkAdminSession() {
+    const saved = localStorage.getItem('adminLoggedIn');
+    if (saved === 'true') {
+        isAdmin = true;
+        updateAdminUI();
+        console.log('✅ Admin session restored from localStorage');
+    }
+}
+
 // ===== FIREBASE LISTENERS =====
 db.ref('shifts').on('value', (snapshot) => {
     const data = snapshot.val();
@@ -308,10 +316,11 @@ function verifyPassword() {
     const target = document.getElementById('passwordInput').dataset.target;
     if (input === ADMIN_PASSWORD) {
         isAdmin = true;
+        // ⭐ SAVE SESSION
+        localStorage.setItem('adminLoggedIn', 'true');
         closePasswordModal();
         updateAdminUI();
         if (target === 'settings') { showPage('settings'); }
-        // If there was a pending day click, open it now
         if (window.pendingDay) {
             openModal(window.pendingDay);
             window.pendingDay = null;
@@ -325,6 +334,8 @@ function verifyPassword() {
 }
 function logoutAdmin() {
     isAdmin = false;
+    // ⭐ CLEAR SESSION
+    localStorage.removeItem('adminLoggedIn');
     updateAdminUI();
     showPage('calendar');
     showToast('تم تسجيل الخروج', 'success');
@@ -339,7 +350,6 @@ function updateAdminUI() {
 function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
     document.getElementById(page + 'Page').classList.remove('hidden');
-    // Update nav button active state
     document.querySelectorAll('.nav-btn').forEach(btn => {
         if (btn.dataset.page === page) {
             btn.classList.add('bg-white/20');
@@ -540,11 +550,9 @@ function renderCalendar() {
         if (employee) { cellClasses += employee.color + ' '; }
         else { cellClasses += 'bg-white '; }
         if (isCurrentMonth && day === today.getDate()) { cellClasses += 'today-highlight '; }
-        // Only add cursor-pointer if admin
         if (isAdmin) { cellClasses += 'cursor-pointer '; }
         let cell = document.createElement('div');
         cell.className = cellClasses;
-        // Only attach click handler if admin
         if (isAdmin) {
             cell.onclick = () => openModal(day);
         }
@@ -588,11 +596,9 @@ function renderLandscapeCalendar() {
         if (employee) { cellClasses += employee.color + ' '; }
         else { cellClasses += 'bg-white '; }
         if (isCurrentMonth && day === today.getDate()) { cellClasses += 'today-highlight '; }
-        // Only add cursor-pointer if admin
         if (isAdmin) { cellClasses += 'cursor-pointer '; }
         let cell = document.createElement('div');
         cell.className = cellClasses;
-        // Only attach click handler if admin
         if (isAdmin) {
             cell.onclick = () => openModal(day);
         }
@@ -732,6 +738,9 @@ document.addEventListener('keydown', (e) => {
         verifyPassword();
     }
 });
+
+// ⭐ CHECK SAVED SESSION ON LOAD
+checkAdminSession();
 </script>
 </body>
 </html>
