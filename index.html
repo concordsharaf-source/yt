@@ -285,10 +285,10 @@ function updateStatus(connected) {
     const status = document.getElementById('firebaseStatus');
     status.classList.remove('hidden');
     if (connected) {
-        status.textContent = '🟢 متصل';
+        status.textContent = '🟢';
         status.className = 'hidden inline-block px-3 py-1 rounded-full text-xs bg-green-500/80 text-white border border-white/30';
     } else {
-        status.textContent = '🔴 غير متصل';
+        status.textContent = '🔴';
         status.className = 'hidden inline-block px-3 py-1 rounded-full text-xs bg-red-500/80 text-white border border-white/30';
     }
     status.classList.remove('hidden');
