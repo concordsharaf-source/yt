@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -9,7 +10,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
   <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
-  
+
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 body { font-family: 'Tajawal', sans-serif; }
@@ -49,6 +50,96 @@ body { font-family: 'Tajawal', sans-serif; }
     25% { transform: rotate(-10deg); }
     75% { transform: rotate(10deg); }
 }
+/* ===== SWIPE STYLES ===== */
+#mobileDayView { position: relative; overflow: hidden; }
+#dayCardContainer { 
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease; 
+    will-change: transform, opacity;
+}
+/* ===== DYNAMIC SWIPE ANIMATIONS ===== */
+.swipe-out-right {
+    animation: swipeOutRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+.swipe-out-left {
+    animation: swipeOutLeft 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+.swipe-in-right {
+    animation: swipeInRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+.swipe-in-left {
+    animation: swipeInLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes swipeOutRight {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(120px) rotateY(10deg) scale(0.92); opacity: 0; }
+}
+@keyframes swipeOutLeft {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(-120px) rotateY(-10deg) scale(0.92); opacity: 0; }
+}
+@keyframes swipeInRight {
+    0% { transform: translateX(120px) rotateY(10deg) scale(0.92); opacity: 0; }
+    100% { transform: translateX(0) rotateY(0deg) scale(1); opacity: 1; }
+}
+@keyframes swipeInLeft {
+    0% { transform: translateX(-120px) rotateY(-10deg) scale(0.92); opacity: 0; }
+    100% { transform: translateX(0) rotateY(0deg) scale(1); opacity: 1; }
+}
+/* ===== CONTENT BOUNCE ANIMATION ===== */
+.content-bounce-in {
+    animation: contentBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+@keyframes contentBounceIn {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+/* ===== EMPLOYEE BADGE POP ANIMATION ===== */
+.badge-pop {
+    animation: badgePop 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+@keyframes badgePop {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+/* ===== NUMBER COUNTER ANIMATION ===== */
+.number-roll {
+    animation: numberRoll 0.5s ease-out forwards;
+}
+@keyframes numberRoll {
+    0% { transform: translateY(-30px); opacity: 0; }
+    60% { transform: translateY(5px); opacity: 1; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+.day-card-gray { background: linear-gradient(135deg, #374151, #6b7280) !important; }
+.day-card-gray .employee-badge-gray { background-color: #4b5563 !important; color: #d1d5db !important; }
+.day-card-gray .employee-card-gray { background-color: rgba(255,255,255,0.1) !important; }
+.day-card-gray .employee-name-gray { color: #d1d5db !important; }
+.day-card-gray .day-number-gray { color: #d1d5db !important; }
+.day-card-gray .day-month-gray { color: #9ca3af !important; }
+.day-card-gray .day-name-gray { color: #9ca3af !important; }
+.swipe-hint {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    color: rgba(255,255,255,0.3);
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+.swipe-hint-right { right: 20px; }
+.swipe-hint-left { left: 20px; }
+/* ===== SWIPE HINT PULSE ===== */
+.swipe-hint-active {
+    animation: hintPulse 0.8s ease-in-out;
+    opacity: 0.8 !important;
+}
+@keyframes hintPulse {
+    0%, 100% { transform: translateY(-50%) scale(1); }
+    50% { transform: translateY(-50%) scale(1.3); }
+}
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -77,6 +168,10 @@ body { font-family: 'Tajawal', sans-serif; }
 <div id="calendarPage" class="page">
     <div id="mobileDayView" class="mobile-day-view flex-col">
         <div id="dayCardContainer" class="flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen">
+            <!-- Swipe hints -->
+            <div class="swipe-hint swipe-hint-left" id="swipeHintLeft">◀</div>
+            <div class="swipe-hint swipe-hint-right" id="swipeHintRight">▶</div>
+
             <div id="employeeCard" class="absolute top-6 left-6 bg-white/20 backdrop-blur-md rounded-3xl p-4 border border-white/30 shadow-2xl">
                 <img id="employeeAvatar" src="" alt="" class="w-28 h-28 rounded-full border-4 border-white/60 shadow-xl object-cover">
                 <p id="employeeCardName" class="text-white text-center text-base font-bold mt-3"></p>
@@ -230,6 +325,12 @@ let employees = JSON.parse(JSON.stringify(defaultEmployees));
 let shifts = {};
 let firebaseReady = false;
 
+// ===== SWIPE STATE =====
+let mobileViewDate = new Date();
+let touchStartX = 0;
+let touchEndX = 0;
+let isAnimating = false; // Prevent double swipe during animation
+
 const arabicMonths = [
 'يناير','فبراير','مارس','أبريل','مايو','يونيو',
 'يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'
@@ -362,6 +463,8 @@ function showPage(page) {
     });
     if (page === 'stats') renderStats();
     if (page === 'calendar') {
+        // Reset mobile view to today when returning to calendar
+        mobileViewDate = new Date();
         renderCalendar();
         renderLandscapeCalendar();
         renderMobileDayView();
@@ -424,41 +527,239 @@ function getNextFriday(date) {
     return d;
 }
 
+// ===== DYNAMIC SWIPE HANDLERS =====
+function initSwipe() {
+    const container = document.getElementById('dayCardContainer');
+    if (!container) return;
+
+    container.addEventListener('touchstart', (e) => {
+        if (isAnimating) return;
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+        if (isAnimating) return;
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+}
+
+function handleSwipe() {
+    const swipeThreshold = 60;
+    const diff = touchEndX - touchStartX;
+
+    // ⭐ RTL: swipe right (positive diff) = NEXT day (newer)
+    // ⭐ RTL: swipe left (negative diff) = PREVIOUS day (older)
+    if (Math.abs(diff) > swipeThreshold && !isAnimating) {
+        isAnimating = true;
+        const container = document.getElementById('dayCardContainer');
+        const isNextDay = diff > 0;
+
+        // Determine animation classes
+        const outClass = isNextDay ? 'swipe-out-right' : 'swipe-out-left';
+        const inClass = isNextDay ? 'swipe-in-left' : 'swipe-in-right';
+
+        // Flash the hint arrow
+        flashSwipeHint(isNextDay ? 'right' : 'left');
+
+        // Phase 1: Animate out
+        container.classList.add(outClass);
+
+        setTimeout(() => {
+            // Update date
+            if (isNextDay) {
+                mobileViewDate.setDate(mobileViewDate.getDate() + 1);
+            } else {
+                mobileViewDate.setDate(mobileViewDate.getDate() - 1);
+            }
+
+            // Render new content
+            renderMobileDayView();
+
+            // Remove out class and add in class
+            container.classList.remove(outClass);
+            container.classList.add(inClass);
+
+            // Phase 2: Animate in with content effects
+            animateContentElements();
+
+            setTimeout(() => {
+                container.classList.remove(inClass);
+                isAnimating = false;
+            }, 500);
+        }, 400);
+    }
+}
+
+// ===== FLASH SWIPE HINT =====
+function flashSwipeHint(direction) {
+    const hint = document.getElementById(direction === 'right' ? 'swipeHintRight' : 'swipeHintLeft');
+    if (hint) {
+        hint.classList.add('swipe-hint-active');
+        setTimeout(() => hint.classList.remove('swipe-hint-active'), 800);
+    }
+}
+
+// ===== ANIMATE CONTENT ELEMENTS =====
+function animateContentElements() {
+    const dayNumber = document.getElementById('dayNumber');
+    const dayMonth = document.getElementById('dayMonth');
+    const dayName = document.getElementById('dayName');
+    const employeeBadge = document.getElementById('employeeBadge');
+    const employeeCard = document.getElementById('employeeCard');
+
+    // Reset animations
+    [dayNumber, dayMonth, dayName, employeeBadge].forEach(el => {
+        if (el) {
+            el.style.animation = 'none';
+            el.offsetHeight; // Trigger reflow
+            el.style.animation = '';
+        }
+    });
+
+    // Staggered animations
+    if (dayNumber) {
+        dayNumber.style.animation = 'none';
+        dayNumber.offsetHeight;
+        dayNumber.classList.add('number-roll');
+        setTimeout(() => dayNumber.classList.remove('number-roll'), 500);
+    }
+
+    setTimeout(() => {
+        if (dayMonth) {
+            dayMonth.style.animation = 'none';
+            dayMonth.offsetHeight;
+            dayMonth.style.opacity = '0';
+            requestAnimationFrame(() => {
+                dayMonth.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                dayMonth.style.opacity = '1';
+                dayMonth.style.transform = 'translateY(0)';
+            });
+        }
+        if (dayName) {
+            dayName.style.animation = 'none';
+            dayName.offsetHeight;
+            dayName.style.opacity = '0';
+            requestAnimationFrame(() => {
+                dayName.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                dayName.style.opacity = '1';
+                dayName.style.transform = 'translateY(0)';
+            });
+        }
+    }, 100);
+
+    setTimeout(() => {
+        if (employeeBadge) {
+            employeeBadge.classList.add('badge-pop');
+            setTimeout(() => employeeBadge.classList.remove('badge-pop'), 500);
+        }
+    }, 200);
+
+    setTimeout(() => {
+        if (employeeCard && employeeCard.style.display !== 'none') {
+            employeeCard.style.animation = 'none';
+            employeeCard.offsetHeight;
+            employeeCard.style.opacity = '0';
+            employeeCard.style.transform = 'scale(0.8)';
+            requestAnimationFrame(() => {
+                employeeCard.style.transition = 'opacity 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55), transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55)';
+                employeeCard.style.opacity = '1';
+                employeeCard.style.transform = 'scale(1)';
+            });
+        }
+    }, 300);
+}
+
 // ===== RENDER =====
 function renderMobileDayView() {
     const container = document.getElementById('mobileDayView');
     if (!container) return;
+
+    const viewDate = new Date(mobileViewDate);
     const today = new Date();
-    const employee = getEmployeeForDate(today);
-    const dayNum = today.getDate();
-    const monthName = arabicMonths[today.getMonth()];
-    const year = today.getFullYear();
-    const dayName = arabicDays[today.getDay()];
+    const isToday = (
+        viewDate.getFullYear() === today.getFullYear() &&
+        viewDate.getMonth() === today.getMonth() &&
+        viewDate.getDate() === today.getDate()
+    );
+
+    const employee = getEmployeeForDate(viewDate);
+    const dayNum = viewDate.getDate();
+    const monthName = arabicMonths[viewDate.getMonth()];
+    const year = viewDate.getFullYear();
+    const dayName = arabicDays[viewDate.getDay()];
+
     document.getElementById('dayNumber').textContent = dayNum;
     document.getElementById('dayMonth').textContent = monthName + ' ' + year;
     document.getElementById('dayName').textContent = dayName;
+
     const badge = document.getElementById('employeeBadge');
     const cardContainer = document.getElementById('dayCardContainer');
     const avatar = document.getElementById('employeeAvatar');
     const cardName = document.getElementById('employeeCardName');
+
+    // Reset classes
+    cardContainer.className = 'flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen';
+    document.getElementById('dayNumber').className = 'text-[120px] font-extrabold drop-shadow-2xl leading-none mb-2';
+    document.getElementById('dayMonth').className = 'text-3xl font-bold mb-4';
+    document.getElementById('dayName').className = 'text-2xl mb-10';
+
     if (employee) {
-        badge.textContent = employee.name;
-        badge.className = `inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring ${employee.color}`;
-        cardContainer.className = 'flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen ' + employee.bgClass;
-        avatar.src = employee.image;
-        avatar.alt = employee.name;
-        cardName.textContent = employee.name;
-        document.getElementById('employeeCard').style.display = 'block';
+        if (isToday) {
+            // Today: full colors
+            badge.textContent = employee.name;
+            badge.className = `inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring ${employee.color}`;
+            cardContainer.classList.add(employee.bgClass);
+            avatar.src = employee.image;
+            avatar.alt = employee.name;
+            cardName.textContent = employee.name;
+            document.getElementById('employeeCard').style.display = 'block';
+
+            document.getElementById('dayNumber').classList.add('text-white');
+            document.getElementById('dayMonth').classList.add('text-white/90');
+            document.getElementById('dayName').classList.add('text-white/80');
+        } else {
+            // Past/Future: gray colors
+            badge.textContent = employee.name;
+            badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl bg-gray-600 text-gray-200';
+            cardContainer.classList.add('day-card-gray');
+            avatar.src = employee.image;
+            avatar.alt = employee.name;
+            cardName.textContent = employee.name;
+            document.getElementById('employeeCard').style.display = 'block';
+            document.getElementById('employeeCard').classList.add('employee-card-gray');
+            cardName.classList.add('employee-name-gray');
+
+            document.getElementById('dayNumber').classList.add('day-number-gray');
+            document.getElementById('dayMonth').classList.add('day-month-gray');
+            document.getElementById('dayName').classList.add('day-name-gray');
+        }
     } else {
-        badge.textContent = 'لا يوجد تعيين';
-        badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl bg-gray-500 text-white';
-        cardContainer.className = 'flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen day-card-bg';
-        document.getElementById('employeeCard').style.display = 'none';
+        if (isToday) {
+            badge.textContent = 'لا يوجد تعيين';
+            badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl bg-gray-500 text-white';
+            cardContainer.className = 'flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen day-card-bg';
+            document.getElementById('employeeCard').style.display = 'none';
+
+            document.getElementById('dayNumber').classList.add('text-white');
+            document.getElementById('dayMonth').classList.add('text-white/90');
+            document.getElementById('dayName').classList.add('text-white/80');
+        } else {
+            badge.textContent = 'لا يوجد تعيين';
+            badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl bg-gray-600 text-gray-300';
+            cardContainer.classList.add('day-card-gray');
+            document.getElementById('employeeCard').style.display = 'none';
+
+            document.getElementById('dayNumber').classList.add('day-number-gray');
+            document.getElementById('dayMonth').classList.add('day-month-gray');
+            document.getElementById('dayName').classList.add('day-name-gray');
+        }
     }
-    const nextFriday = getNextFriday(today);
+
+    const nextFriday = getNextFriday(viewDate);
     const nextFridayEmployee = getEmployeeForDate(nextFriday);
     const noteDiv = document.getElementById('nextFridayNote');
-    if (today.getDay() === 5) {
+    if (viewDate.getDay() === 5) {
         if (nextFridayEmployee) {
             document.getElementById('nextFridayText').textContent = 
                 'الجمعة القادمة ' + nextFriday.getDate() + ' ' + arabicMonths[nextFriday.getMonth()] + ': ' + nextFridayEmployee.name;
@@ -744,6 +1045,8 @@ document.addEventListener('keydown', (e) => {
 
 // ⭐ CHECK SAVED SESSION ON LOAD
 checkAdminSession();
+// ⭐ INIT SWIPE
+initSwipe();
 </script>
   <script>
   if ('serviceWorker' in navigator) {
