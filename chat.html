@@ -34,18 +34,9 @@
             flex-direction: column;
             gap: 0.75rem;
         }
-        .message-wrapper {
-            display: flex;
-            flex-direction: column;
-            max-width: 80%;
-            position: relative;
-        }
-        .message-wrapper.sent {
-            align-self: flex-end;
-        }
-        .message-wrapper.received {
-            align-self: flex-start;
-        }
+        .message-wrapper { max-width: 80%; position: relative; }
+        .message-wrapper.sent { align-self: flex-end; }
+        .message-wrapper.received { align-self: flex-start; }
         .message-bubble {
             padding: 0.75rem 1rem;
             border-radius: 1.25rem;
@@ -53,96 +44,24 @@
             word-wrap: break-word;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
-        .sent .message-bubble {
-            background: #d1f7c4;
-            border-bottom-right-radius: 0.25rem;
-        }
-        .received .message-bubble {
-            background: white;
-            border-bottom-left-radius: 0.25rem;
-        }
-        .sender-name {
-            font-size: 0.7rem;
-            font-weight: bold;
-            color: #3b82f6;
-            margin-bottom: 0.25rem;
-        }
-        .message-time {
-            font-size: 0.65rem;
-            color: #6b7280;
-            margin-top: 0.25rem;
-            text-align: left;
-        }
-        .message-image {
-            max-width: 250px;
-            border-radius: 0.75rem;
-            margin: 0.5rem 0;
-            cursor: pointer;
-        }
-        .message-audio {
-            margin: 0.5rem 0;
-            max-width: 250px;
-        }
-        .reactions-bar {
-            display: flex;
-            gap: 0.25rem;
-            margin-top: 0.25rem;
-            flex-wrap: wrap;
-        }
-        .reaction-badge {
-            background: white;
-            border-radius: 1rem;
-            padding: 0.1rem 0.5rem;
-            font-size: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            cursor: pointer;
-        }
-        .context-menu {
-            position: fixed;
-            background: white;
-            border-radius: 1rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            z-index: 100;
-            padding: 0.5rem;
-            min-width: 150px;
-        }
-        .reaction-picker {
-            position: fixed;
-            background: white;
-            border-radius: 2rem;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            z-index: 100;
-            padding: 0.5rem 1rem;
-            display: flex;
-            gap: 0.5rem;
-            font-size: 1.5rem;
-        }
+        .sent .message-bubble { background: #d1f7c4; border-bottom-right-radius: 0.25rem; }
+        .received .message-bubble { background: white; border-bottom-left-radius: 0.25rem; }
+        .sender-name { font-size: 0.7rem; font-weight: bold; color: #3b82f6; margin-bottom: 0.25rem; }
+        .message-time { font-size: 0.65rem; color: #6b7280; margin-top: 0.25rem; text-align: left; }
         .connection-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-left: 4px;
+            width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-left: 4px;
         }
         .connection-dot.online { background-color: #22c55e; box-shadow: 0 0 10px #22c55e; }
         .connection-dot.offline { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
-        .edited-mark {
-            font-size: 0.6rem;
-            color: #9ca3af;
-            margin-right: 0.25rem;
-        }
-        @media (max-width: 640px) {
-            .message-wrapper { max-width: 90%; }
-        }
     </style>
 </head>
 <body>
     <div class="chat-container">
-        <!-- الهيدر -->
+        <!-- هيدر مطابق للرئيسية -->
         <nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg p-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <span id="connectionIndicator" class="connection-dot offline"></span>
-                <h1 class="text-lg font-bold">💬 الدردشة</h1>
+                <h1 class="text-lg font-bold" id="chatHeaderTitle">💬 الدردشة</h1>
             </div>
             <div class="flex items-center gap-3">
                 <span id="welcomeUser" class="text-sm"></span>
@@ -150,49 +69,18 @@
             </div>
         </nav>
 
-        <!-- رسائل -->
         <div id="messagesContainer" class="chat-messages">
             <div class="text-center text-gray-400 py-8">جارٍ تحميل المحادثة...</div>
         </div>
 
-        <!-- شريط الإدخال -->
         <div class="bg-white border-t p-3 flex items-end gap-2">
-            <button id="attachBtn" class="text-2xl p-2 hover:bg-gray-100 rounded-full">📎</button>
-            <input type="file" id="imageInput" accept="image/*" class="hidden">
-            <div class="flex-1 relative">
-                <textarea id="messageInput" rows="1" placeholder="اكتب رسالة..."
-                    class="w-full border border-gray-300 rounded-xl px-4 py-2 pr-10 resize-none outline-none focus:border-blue-500"></textarea>
-                <button id="voiceBtn" class="absolute left-2 top-1/2 -translate-y-1/2 text-xl p-1 hover:bg-gray-100 rounded-full">🎤</button>
-            </div>
-            <button id="sendBtn" class="bg-blue-500 text-white p-2 rounded-full text-xl hover:bg-blue-600">➤</button>
+            <input type="text" id="messageInput" placeholder="اكتب رسالة..." class="flex-1 border rounded-xl px-4 py-2 outline-none">
+            <button id="sendBtn" class="bg-blue-500 text-white px-4 py-2 rounded-full">➤</button>
         </div>
-        <!-- تسجيل صوتي UI -->
-        <div id="recordingUI" class="bg-red-50 border-t border-red-200 p-3 hidden">
-            <div class="flex items-center justify-between">
-                <span class="text-red-600">🔴 جاري التسجيل...</span>
-                <button id="stopRecordingBtn" class="bg-red-500 text-white px-4 py-1 rounded-lg">إيقاف</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- قائمة السياق للرسالة -->
-    <div id="contextMenu" class="context-menu hidden">
-        <button data-action="edit" class="block w-full text-right px-4 py-2 hover:bg-gray-100 rounded-lg">✏️ تعديل</button>
-        <button data-action="delete" class="block w-full text-right px-4 py-2 hover:bg-gray-100 rounded-lg text-red-500">🗑️ حذف</button>
-    </div>
-
-    <!-- منتقي الريأكشن -->
-    <div id="reactionPicker" class="reaction-picker hidden">
-        <span data-reaction="👍">👍</span>
-        <span data-reaction="❤️">❤️</span>
-        <span data-reaction="😂">😂</span>
-        <span data-reaction="😮">😮</span>
-        <span data-reaction="😢">😢</span>
-        <span data-reaction="😡">😡</span>
     </div>
 
     <script>
-        // تهيئة Firebase (نفس الإعدادات)
+        // Firebase config
         const firebaseConfig = {
             apiKey: "AIzaSyCHd1yY27vSskKuvvNZ_XmtwgoHc3lPe5k",
             authDomain: "ytcalender-bae88.firebaseapp.com",
@@ -205,351 +93,61 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // استعادة الجلسة
-        let currentUser = null;
-        const savedUser = localStorage.getItem('currentUserForChat');
-        if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            document.getElementById('welcomeUser').textContent = '👋 ' + currentUser.username;
-            if (currentUser.role === 'admin') {
-                // يمكن إضافة تاج أدمن
-            }
-            initChat();
-        } else {
-            // الرجوع للصفحة الرئيسية
-            alert('الرجاء تسجيل الدخول أولاً');
+        let currentUser = JSON.parse(localStorage.getItem('currentUserForChat'));
+        if (!currentUser) {
+            alert('الرجاء تسجيل الدخول من الصفحة الرئيسية أولاً');
             window.location.href = 'index.html';
         }
 
-        function goBackToCalendar() {
-            window.location.href = 'index.html';
-        }
+        document.getElementById('welcomeUser').textContent = '👋 ' + currentUser.username;
+        document.getElementById('chatHeaderTitle').textContent = '💬 الدردشة - ' + currentUser.username;
 
-        // مؤشر الاتصال
         const connectedRef = firebase.database().ref(".info/connected");
         connectedRef.on("value", (snap) => {
             document.getElementById('connectionIndicator').className = 
                 'connection-dot ' + (snap.val() === true ? 'online' : 'offline');
         });
 
-        // عناصر DOM
-        const messagesContainer = document.getElementById('messagesContainer');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const imageInput = document.getElementById('imageInput');
-        const attachBtn = document.getElementById('attachBtn');
-        const voiceBtn = document.getElementById('voiceBtn');
-        const recordingUI = document.getElementById('recordingUI');
-        const stopRecordingBtn = document.getElementById('stopRecordingBtn');
-        const contextMenu = document.getElementById('contextMenu');
-        const reactionPicker = document.getElementById('reactionPicker');
-
-        let mediaRecorder;
-        let audioChunks = [];
-        let currentContextMessageKey = null;
-        let currentReactionMessageKey = null;
-
-        // تهيئة الدردشة
-        function initChat() {
-            // استقبال الرسائل الجديدة
-            db.ref('chat/general').on('child_added', (snapshot) => {
-                appendMessage(snapshot.key, snapshot.val());
-            });
-
-            // تحديث الرسائل المعدلة
-            db.ref('chat/general').on('child_changed', (snapshot) => {
-                updateMessage(snapshot.key, snapshot.val());
-            });
-
-            // حذف الرسالة
-            db.ref('chat/general').on('child_removed', (snapshot) => {
-                removeMessageElement(snapshot.key);
-            });
-
-            // تحميل أولي
-            db.ref('chat/general').once('value', (snapshot) => {
-                messagesContainer.innerHTML = '';
-                const messages = snapshot.val();
-                if (messages) {
-                    Object.entries(messages).forEach(([key, msg]) => appendMessage(key, msg));
-                }
-                scrollToBottom();
-            });
-
-            // أحداث الإدخال
-            sendBtn.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-            attachBtn.addEventListener('click', () => imageInput.click());
-            imageInput.addEventListener('change', handleImageUpload);
-            voiceBtn.addEventListener('click', toggleRecording);
-            stopRecordingBtn.addEventListener('click', stopRecording);
-
-            // إخفاء القوائم عند النقر بالخارج
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.context-menu') && !e.target.closest('.message-bubble')) {
-                    contextMenu.classList.add('hidden');
-                }
-                if (!e.target.closest('.reaction-picker') && !e.target.closest('.reaction-btn')) {
-                    reactionPicker.classList.add('hidden');
-                }
-            });
-        }
-
-        function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text) return;
-            const message = {
-                text,
-                sender: currentUser.username,
-                senderId: currentUser.id,
-                time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                isAdmin: currentUser.role === 'admin',
-                edited: false,
-                reactions: {}
-            };
-            db.ref('chat/general').push(message);
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-        }
-
-        function handleImageUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const message = {
-                    image: event.target.result,
-                    sender: currentUser.username,
-                    senderId: currentUser.id,
-                    time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-                    timestamp: firebase.database.ServerValue.TIMESTAMP,
-                    isAdmin: currentUser.role === 'admin',
-                    edited: false,
-                    reactions: {}
-                };
-                db.ref('chat/general').push(message);
-            };
-            reader.readAsDataURL(file);
-            imageInput.value = '';
-        }
-
-        // تسجيل الصوت
-        async function toggleRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                stopRecording();
+        function goBackToCalendar() {
+            if (window.opener && !window.opener.closed) {
+                window.opener.focus();
+                window.close();
             } else {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const message = {
-                                audio: event.target.result,
-                                sender: currentUser.username,
-                                senderId: currentUser.id,
-                                time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-                                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                                isAdmin: currentUser.role === 'admin',
-                                edited: false,
-                                reactions: {}
-                            };
-                            db.ref('chat/general').push(message);
-                        };
-                        reader.readAsDataURL(audioBlob);
-                        recordingUI.classList.add('hidden');
-                    };
-                    mediaRecorder.start();
-                    recordingUI.classList.remove('hidden');
-                } catch (err) {
-                    alert('لا يمكن الوصول إلى الميكروفون');
-                }
+                window.location.href = 'index.html';
             }
         }
 
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                mediaRecorder = null;
-            }
-        }
-
-        // عرض رسالة
-        function appendMessage(key, msg) {
-            if (document.getElementById(`msg-${key}`)) return;
-            const wrapper = document.createElement('div');
-            wrapper.className = `message-wrapper ${msg.sender === currentUser.username ? 'sent' : 'received'}`;
-            wrapper.id = `msg-${key}`;
-            
-            let content = '';
-            if (msg.text) {
-                content += `<div class="message-text">${escapeHtml(msg.text)}</div>`;
-            }
-            if (msg.image) {
-                content += `<img src="${msg.image}" class="message-image" onclick="window.open(this.src)">`;
-            }
-            if (msg.audio) {
-                content += `<audio controls class="message-audio" src="${msg.audio}"></audio>`;
-            }
-
-            const bubble = document.createElement('div');
-            bubble.className = 'message-bubble';
-            bubble.innerHTML = `
-                ${msg.sender !== currentUser.username ? `<div class="sender-name">${msg.sender} ${msg.isAdmin ? '👑' : ''}</div>` : ''}
-                ${content}
-                <div class="message-time">
-                    ${msg.edited ? '<span class="edited-mark">(معدلة)</span>' : ''}
-                    ${msg.time || ''}
-                </div>
-            `;
-            
-            // إضافة زر الريأكشن
-            const reactBtn = document.createElement('button');
-            reactBtn.className = 'reaction-btn text-gray-400 hover:text-gray-600 text-sm mt-1';
-            reactBtn.innerHTML = '😀 +';
-            reactBtn.onclick = (e) => {
-                e.stopPropagation();
-                showReactionPicker(e, key);
-            };
-            wrapper.appendChild(bubble);
-            wrapper.appendChild(reactBtn);
-            
-            // عرض الريأكشنز الحالية
-            if (msg.reactions && Object.keys(msg.reactions).length > 0) {
-                const reactionsBar = document.createElement('div');
-                reactionsBar.className = 'reactions-bar';
-                for (let [emoji, users] of Object.entries(msg.reactions)) {
-                    if (users && users.length > 0) {
-                        const badge = document.createElement('span');
-                        badge.className = 'reaction-badge';
-                        badge.textContent = `${emoji} ${users.length}`;
-                        badge.title = users.join(', ');
-                        badge.onclick = () => toggleReaction(key, emoji);
-                        reactionsBar.appendChild(badge);
-                    }
-                }
-                wrapper.appendChild(reactionsBar);
-            }
-
-            // الضغط المطول للقائمة
-            bubble.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                showContextMenu(e, key, msg);
-            });
-            bubble.addEventListener('touchstart', handleTouchStart);
-            bubble.addEventListener('touchend', handleTouchEnd);
-            bubble.touchKey = key;
-            bubble.touchMsg = msg;
-
-            messagesContainer.appendChild(wrapper);
-            scrollToBottom();
-        }
-
-        function updateMessage(key, msg) {
-            const existing = document.getElementById(`msg-${key}`);
-            if (existing) {
-                existing.remove();
-                appendMessage(key, msg);
-            }
-        }
-
-        function removeMessageElement(key) {
-            const el = document.getElementById(`msg-${key}`);
-            if (el) el.remove();
-        }
-
-        // قائمة السياق
-        function showContextMenu(e, key, msg) {
-            if (msg.sender !== currentUser.username && currentUser.role !== 'admin') return;
-            currentContextMessageKey = key;
-            contextMenu.classList.remove('hidden');
-            contextMenu.style.left = e.pageX + 'px';
-            contextMenu.style.top = e.pageY + 'px';
-        }
-
-        contextMenu.querySelector('[data-action="edit"]').onclick = () => {
-            const key = currentContextMessageKey;
-            if (!key) return;
-            db.ref('chat/general/' + key).once('value', snap => {
-                const msg = snap.val();
-                if (msg && msg.text) {
-                    const newText = prompt('تعديل الرسالة:', msg.text);
-                    if (newText && newText.trim() !== '') {
-                        db.ref('chat/general/' + key).update({ text: newText.trim(), edited: true });
-                    }
-                }
-            });
-            contextMenu.classList.add('hidden');
-        };
-
-        contextMenu.querySelector('[data-action="delete"]').onclick = () => {
-            const key = currentContextMessageKey;
-            if (key && confirm('هل أنت متأكد من حذف الرسالة؟')) {
-                db.ref('chat/general/' + key).remove();
-            }
-            contextMenu.classList.add('hidden');
-        };
-
-        // الريأكشن
-        function showReactionPicker(e, key) {
-            currentReactionMessageKey = key;
-            reactionPicker.classList.remove('hidden');
-            reactionPicker.style.left = e.pageX + 'px';
-            reactionPicker.style.top = (e.pageY - 60) + 'px';
-        }
-
-        reactionPicker.querySelectorAll('span').forEach(span => {
-            span.onclick = () => {
-                const emoji = span.dataset.reaction;
-                toggleReaction(currentReactionMessageKey, emoji);
-                reactionPicker.classList.add('hidden');
-            };
+        // تحميل الرسائل
+        const messagesContainer = document.getElementById('messagesContainer');
+        db.ref('chat/general').on('child_added', (snap) => {
+            appendMessage(snap.key, snap.val());
         });
 
-        function toggleReaction(key, emoji) {
-            db.ref('chat/general/' + key + '/reactions/' + emoji).transaction(users => {
-                if (users === null) return [currentUser.username];
-                if (Array.isArray(users)) {
-                    if (users.includes(currentUser.username)) {
-                        const filtered = users.filter(u => u !== currentUser.username);
-                        return filtered.length > 0 ? filtered : null;
-                    } else {
-                        return [...users, currentUser.username];
-                    }
-                }
-                return [currentUser.username];
-            });
-        }
-
-        // ضغط مطول على الجوال
-        let longPressTimer;
-        function handleTouchStart(e) {
-            const bubble = e.currentTarget;
-            longPressTimer = setTimeout(() => {
-                showContextMenu(e, bubble.touchKey, bubble.touchMsg);
-            }, 600);
-        }
-        function handleTouchEnd(e) {
-            clearTimeout(longPressTimer);
-        }
-
-        function scrollToBottom() {
+        function appendMessage(key, msg) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper ${msg.sender === currentUser.username ? 'sent' : 'received'}`;
+            wrapper.innerHTML = `
+                <div class="message-bubble">
+                    ${msg.sender !== currentUser.username ? `<div class="sender-name">${msg.sender}</div>` : ''}
+                    <div>${msg.text || ''}</div>
+                    <div class="message-time">${msg.time || ''}</div>
+                </div>
+            `;
+            messagesContainer.appendChild(wrapper);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        function escapeHtml(text) {
-            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
+        document.getElementById('sendBtn').addEventListener('click', () => {
+            const text = document.getElementById('messageInput').value.trim();
+            if (!text) return;
+            db.ref('chat/general').push({
+                text,
+                sender: currentUser.username,
+                time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            document.getElementById('messageInput').value = '';
+        });
     </script>
 </body>
 </html>
