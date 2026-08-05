@@ -9,24 +9,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
-        
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --sent-bg: #dcf8c6;
-            --received-bg: #ffffff;
-            --chat-bg: #e8e8e8;
-            --text-primary: #1f2937;
-            --text-secondary: #6b7280;
-        }
 
-        * { box-sizing: border-box; }
-        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             font-family: 'Tajawal', sans-serif;
-            margin: 0;
-            background: #f0f2f5;
+            background: #e8e8e8;
             height: 100vh;
+            width: 100%;
             overflow: hidden;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
@@ -41,10 +31,9 @@
             margin: 0 auto;
             background: #fff;
             box-shadow: 0 0 40px rgba(0,0,0,0.08);
-            position: relative;
         }
 
-        /* الهيدر */
+        /* ----- الهيدر ----- */
         .chat-header {
             background: linear-gradient(135deg, #1e40af, #3b82f6);
             color: white;
@@ -52,62 +41,41 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-            z-index: 30;
             flex-shrink: 0;
+            z-index: 30;
         }
         .header-left { display: flex; align-items: center; gap: 10px; }
-        .header-right { display: flex; align-items: center; gap: 12px; }
         .connection-dot {
-            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+            width: 10px; height: 10px; border-radius: 50%;
             box-shadow: 0 0 8px currentColor;
         }
         .connection-dot.online { background: #22c55e; color: #22c55e; }
         .connection-dot.offline { background: #ef4444; color: #ef4444; }
-        .header-user-avatar {
-            width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
-            border: 2px solid rgba(255,255,255,0.5);
+        .avatar-circle {
+            width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1.1rem; color: white;
+            border: 2px solid rgba(255,255,255,0.6);
+            flex-shrink: 0;
         }
         .back-btn {
             background: rgba(255,255,255,0.15); border: none; color: white;
             padding: 8px 14px; border-radius: 20px; cursor: pointer;
             font-family: 'Tajawal', sans-serif; font-size: 0.85rem;
-            transition: all 0.2s; white-space: nowrap;
         }
-        .back-btn:hover { background: rgba(255,255,255,0.25); }
 
-        /* منطقة الرسائل */
+        /* ----- منطقة الرسائل ----- */
         .messages-area {
             flex: 1;
             overflow-y: auto;
             padding: 16px 12px;
-            background: var(--chat-bg);
+            background: #e8e8e8;
             display: flex;
             flex-direction: column;
             gap: 4px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-        .messages-area::-webkit-scrollbar { width: 5px; }
-        .messages-area::-webkit-scrollbar-thumb { background: #c4c4c4; border-radius: 10px; }
-
-        /* تاريخ */
-        .date-divider {
-            text-align: center;
-            margin: 12px 0;
-            font-size: 0.75rem;
-            color: #6b7280;
-            position: relative;
-        }
-        .date-divider span {
-            background: var(--chat-bg);
-            padding: 4px 16px;
-            border-radius: 20px;
-            position: relative;
-            z-index: 1;
         }
 
-        /* رسالة */
+        /* ----- رسالة ----- */
         .message-row {
             display: flex;
             gap: 8px;
@@ -122,289 +90,135 @@
         .message-row.received { align-self: flex-start; }
 
         .msg-avatar {
-            width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
-            flex-shrink: 0; margin-top: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.9rem; color: white;
+            flex-shrink: 0; margin-top: 4px;
         }
-
-        .msg-content {
-            display: flex;
-            flex-direction: column;
-            min-width: 60px;
-        }
-
+        .msg-content { display: flex; flex-direction: column; min-width: 60px; }
         .msg-sender-name {
             font-size: 0.7rem; font-weight: 700; color: #3b82f6;
             margin-bottom: 2px; padding: 0 4px;
         }
 
-        /* فقاعة الرسالة */
         .msg-bubble {
-            padding: 8px 14px;
-            border-radius: 18px;
-            position: relative;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            line-height: 1.5;
+            padding: 8px 14px; border-radius: 18px;
+            position: relative; word-wrap: break-word; line-height: 1.5;
             box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-            transition: background 0.2s;
         }
-        .sent .msg-bubble {
-            background: var(--sent-bg);
-            border-bottom-right-radius: 4px;
+        .sent .msg-bubble { background: #dcf8c6; border-bottom-right-radius: 4px; }
+        .received .msg-bubble { background: white; border-bottom-left-radius: 4px; }
+
+        .reply-preview {
+            background: rgba(0,0,0,0.06); border-radius: 10px; padding: 6px 10px;
+            margin-bottom: 6px; border-right: 3px solid #3b82f6; font-size: 0.8rem;
+            cursor: pointer; max-width: 100%;
         }
-        .received .msg-bubble {
-            background: var(--received-bg);
-            border-bottom-left-radius: 4px;
+        .reply-preview .reply-sender { font-weight: 700; color: #3b82f6; font-size: 0.7rem; }
+        .reply-preview .reply-text {
+            color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .msg-image {
+            max-width: 240px; max-height: 300px; border-radius: 12px;
+            cursor: pointer; margin: 4px 0; display: block;
+        }
+        .msg-text { font-size: 0.95rem; color: #1f2937; white-space: pre-wrap; }
+        .msg-text.edited-mark::after {
+            content: ' (مُعدّلة)'; font-size: 0.65rem; color: #9ca3af;
+        }
+        .msg-time {
+            font-size: 0.65rem; color: #8b8b8b; margin-top: 2px;
+            text-align: left; padding: 0 4px; display: flex; align-items: center; gap: 4px;
+        }
+        .msg-actions-btn {
+            opacity: 0; background: none; border: none; cursor: pointer;
+            font-size: 1.1rem; padding: 2px 6px; border-radius: 50%; color: #6b7280;
         }
         .msg-bubble:hover .msg-actions-btn { opacity: 1; }
 
-        /* الرد على رسالة (اقتباس) */
-        .reply-preview {
-            background: rgba(0,0,0,0.06);
-            border-radius: 10px;
-            padding: 6px 10px;
-            margin-bottom: 6px;
-            border-right: 3px solid #3b82f6;
-            font-size: 0.8rem;
-            cursor: pointer;
-            max-width: 100%;
-            overflow: hidden;
-        }
-        .reply-preview .reply-sender {
-            font-weight: 700;
-            color: #3b82f6;
-            font-size: 0.7rem;
-        }
-        .reply-preview .reply-text {
-            color: #4b5563;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* صورة مرفقة */
-        .msg-image {
-            max-width: 240px;
-            max-height: 300px;
-            border-radius: 12px;
-            cursor: pointer;
-            margin: 4px 0;
-            transition: transform 0.2s;
-            display: block;
-        }
-        .msg-image:hover { transform: scale(1.02); }
-
-        /* نص الرسالة */
-        .msg-text {
-            font-size: 0.95rem;
-            color: var(--text-primary);
-            white-space: pre-wrap;
-        }
-        .msg-text.edited-mark::after {
-            content: ' (مُعدّلة)';
-            font-size: 0.65rem;
-            color: #9ca3af;
-        }
-
-        /* وقت الرسالة */
-        .msg-time {
-            font-size: 0.65rem;
-            color: #8b8b8b;
-            margin-top: 2px;
-            text-align: left;
-            padding: 0 4px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        /* زر الإجراءات (⋮) */
-        .msg-actions-btn {
-            opacity: 0;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.1rem;
-            padding: 2px 6px;
-            border-radius: 50%;
-            transition: all 0.2s;
-            color: #6b7280;
-        }
-        .msg-actions-btn:hover { background: rgba(0,0,0,0.08); }
-        .msg-actions-btn.show { opacity: 1; }
-
-        /* الريأكشنات */
+        /* ----- الريأكشن ----- */
         .reactions-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 3px;
-            margin-top: 3px;
-            padding: 0 4px;
+            display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; padding: 0 4px;
         }
         .reaction-chip {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 1px 8px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 3px;
+            background: white; border: 1px solid #e5e7eb; border-radius: 14px;
+            padding: 1px 8px; font-size: 0.75rem; cursor: pointer;
+            display: flex; align-items: center; gap: 3px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            transition: all 0.15s;
         }
-        .reaction-chip:hover { background: #e0e7ff; border-color: #3b82f6; }
         .reaction-chip.active { background: #dbeafe; border-color: #3b82f6; font-weight: 700; }
         .reaction-chip .count { font-size: 0.65rem; color: #6b7280; }
 
-        /* زر إضافة ريأكشن */
+        /* زر الريأكشن الافتراضي (قلب رمادي شفاف) */
         .add-reaction-btn {
-            background: none; border: 1px dashed #d1d5db; border-radius: 14px;
-            padding: 1px 6px; font-size: 0.75rem; cursor: pointer; color: #9ca3af;
-            transition: all 0.15s;
+            background: none; border: none; border-radius: 14px;
+            padding: 1px 6px; font-size: 0.85rem; cursor: pointer;
+            color: rgba(156, 163, 175, 0.5); transition: all 0.2s;
         }
-        .add-reaction-btn:hover { background: #f3f4f6; color: #6b7280; }
+        .add-reaction-btn:hover { color: #ef4444; opacity: 1; transform: scale(1.2); }
 
-        /* قائمة السياق */
+        /* ----- قائمة السياق ومنتقي الريأكشن ----- */
         .context-menu {
-            position: fixed;
-            background: white;
-            border-radius: 14px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.2);
-            z-index: 200;
-            padding: 6px;
-            min-width: 160px;
-            animation: menuIn 0.15s ease;
-        }
-        @keyframes menuIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
+            position: fixed; background: white; border-radius: 14px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.2); z-index: 200;
+            padding: 6px; min-width: 160px;
         }
         .context-menu button {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-            padding: 10px 14px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            border-radius: 10px;
-            font-family: 'Tajawal', sans-serif;
-            font-size: 0.9rem;
-            text-align: right;
-            transition: background 0.15s;
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            padding: 10px 14px; border: none; background: none; cursor: pointer;
+            border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 0.9rem;
         }
         .context-menu button:hover { background: #f3f4f6; }
         .context-menu button.danger { color: #ef4444; }
-        .context-menu button.danger:hover { background: #fef2f2; }
-
-        /* منتقي الريأكشن */
         .reaction-picker {
-            position: fixed;
-            background: white;
-            border-radius: 30px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-            z-index: 200;
-            padding: 8px 14px;
-            display: flex;
-            gap: 8px;
-            font-size: 1.5rem;
-            animation: pickerIn 0.2s ease;
+            position: fixed; background: white; border-radius: 30px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2); z-index: 200;
+            padding: 8px 14px; display: flex; gap: 8px; font-size: 1.5rem;
         }
-        @keyframes pickerIn {
-            from { opacity: 0; transform: translateY(10px) scale(0.9); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .reaction-picker span {
-            cursor: pointer;
-            transition: transform 0.15s;
-            display: block;
-        }
+        .reaction-picker span { cursor: pointer; transition: transform 0.15s; }
         .reaction-picker span:hover { transform: scale(1.4); }
-        .reaction-picker span:active { transform: scale(0.9); }
 
-        /* شريط الإدخال - ثابت أسفل */
+        /* ----- شريط الإدخال (ثابت أسفل) ----- */
         .input-bar {
-            background: white;
-            border-top: 1px solid #e5e7eb;
-            padding: 10px 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-shrink: 0;
-            z-index: 20;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+            background: white; border-top: 1px solid #e5e7eb;
+            padding: 10px 12px; display: flex; align-items: center; gap: 8px;
+            flex-shrink: 0; z-index: 20;
         }
         .input-bar .attach-btn {
             background: none; border: none; font-size: 1.5rem; cursor: pointer;
-            padding: 6px 8px; border-radius: 50%; transition: background 0.2s;
-            flex-shrink: 0;
+            padding: 6px 8px; border-radius: 50%; flex-shrink: 0;
         }
-        .input-bar .attach-btn:hover { background: #f3f4f6; }
         .input-bar input[type="text"] {
-            flex: 1;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 22px;
-            padding: 10px 16px;
-            outline: none;
-            font-family: 'Tajawal', sans-serif;
-            font-size: 0.95rem;
-            line-height: 1.4;
-            transition: border-color 0.2s;
-            background: #fafafa;
+            flex: 1; border: 1.5px solid #e5e7eb; border-radius: 22px;
+            padding: 10px 16px; outline: none; font-family: 'Tajawal', sans-serif;
+            font-size: 0.95rem; background: #fafafa;
         }
         .input-bar input[type="text"]:focus {
-            border-color: #3b82f6;
-            background: white;
+            border-color: #3b82f6; background: white;
         }
         .input-bar .send-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            width: 42px; height: 42px;
-            border-radius: 50%;
-            font-size: 1.3rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: #2563eb; color: white; border: none;
+            width: 42px; height: 42px; border-radius: 50%; font-size: 1.3rem;
+            cursor: pointer; flex-shrink: 0;
         }
-        .input-bar .send-btn:hover { background: var(--primary-dark); transform: scale(1.05); }
-        .input-bar .send-btn:active { transform: scale(0.95); }
 
-        /* شريط الرد */
+        /* ----- شريط الرد ----- */
         .reply-bar {
-            background: #f0f7ff;
-            border-top: 1px solid #bfdbfe;
-            padding: 8px 14px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-shrink: 0;
-            font-size: 0.85rem;
-            animation: slideDown 0.2s ease;
-        }
-        @keyframes slideDown {
-            from { max-height: 0; opacity: 0; padding: 0 14px; }
-            to { max-height: 50px; opacity: 1; padding: 8px 14px; }
+            background: #f0f7ff; border-top: 1px solid #bfdbfe;
+            padding: 8px 14px; display: flex; align-items: center; gap: 10px;
+            flex-shrink: 0; font-size: 0.85rem;
         }
         .reply-bar .cancel-reply {
-            background: none; border: none; font-size: 1.2rem; cursor: pointer;
-            color: #6b7280; padding: 2px 8px; border-radius: 50%;
+            background: none; border: none; font-size: 1.2rem;
+            cursor: pointer; color: #6b7280;
         }
-        .reply-bar .cancel-reply:hover { background: rgba(0,0,0,0.05); }
 
-        /* معاينة الصورة المكبرة */
+        /* ----- معاينة الصورة ----- */
         .image-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 300;
             display: flex; align-items: center; justify-content: center; cursor: pointer;
-            animation: fadeIn 0.2s ease;
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .image-overlay img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
 
         .hidden { display: none !important; }
@@ -412,8 +226,6 @@
         @media (max-width: 640px) {
             .message-row { max-width: 90%; }
             .msg-image { max-width: 200px; max-height: 250px; }
-            .chat-header { padding: 10px 12px; }
-            .input-bar { padding: 8px 10px; }
         }
     </style>
 </head>
@@ -424,22 +236,19 @@
     <header class="chat-header">
         <div class="header-left">
             <span id="connectionIndicator" class="connection-dot offline"></span>
-            <img id="myAvatar" class="header-user-avatar" src="image/default.jpg" alt="">
+            <div id="myAvatarContainer" class="avatar-circle" style="background:#4f46e5;">؟</div>
             <div>
                 <div class="font-bold text-sm" id="headerTitle">💬 الدردشة</div>
                 <div class="text-xs text-white/70" id="headerSubtitle">قناة اليمن اليوم</div>
             </div>
         </div>
         <div class="header-right">
-            <span id="typingIndicator" class="text-xs text-white/80 hidden">✍️ يكتب الآن...</span>
             <button onclick="goBack()" class="back-btn">🗓️ التقويم</button>
         </div>
     </header>
 
     <!-- منطقة الرسائل -->
-    <div id="messagesArea" class="messages-area">
-        <div class="date-divider"><span>اليوم</span></div>
-    </div>
+    <div id="messagesArea" class="messages-area"></div>
 
     <!-- شريط الرد -->
     <div id="replyBar" class="reply-bar hidden">
@@ -448,12 +257,12 @@
         <button class="cancel-reply" onclick="cancelReply()">✕</button>
     </div>
 
-    <!-- شريط الإدخال -->
+    <!-- شريط الإدخال - ثابت أسفل -->
     <div class="input-bar">
-        <button class="attach-btn" onclick="document.getElementById('imageInput').click()" title="إرفاق صورة">🖼️</button>
+        <button class="attach-btn" onclick="document.getElementById('imageInput').click()">🖼️</button>
         <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
         <input type="text" id="messageInput" placeholder="اكتب رسالة..." autocomplete="off" autocorrect="off" spellcheck="false" dir="auto">
-        <button class="send-btn" onclick="sendMessage()" title="إرسال">➤</button>
+        <button class="send-btn" onclick="sendMessage()">➤</button>
     </div>
 </div>
 
@@ -496,70 +305,59 @@ const db = firebase.database();
 
 // ===== المستخدم الحالي =====
 let currentUser = null;
-try {
-    currentUser = JSON.parse(localStorage.getItem('currentUserForChat'));
-} catch(e) {}
-
+try { currentUser = JSON.parse(localStorage.getItem('currentUserForChat')); } catch(e) {}
 if (!currentUser) {
     alert('الرجاء تسجيل الدخول من الصفحة الرئيسية أولاً');
     window.location.href = 'index.html';
 }
 
-// معلومات الموظفين للصور
-const employeesInfo = {
-    'زكريا': { image: 'image/1.jpg' },
-    'منصور': { image: 'image/2.jpg' },
-    'محمد': { image: 'image/3.jpg' },
-    'نورا': { image: 'image/4.jpg' },
-    'اشرف': { image: 'image/admin.jpg' },
-    'شرف': { image: 'image/admin2.jpg' }
+// ===== ألوان الأفاتار لكل شخص =====
+const userColors = {
+    'زكريا': '#22c55e', 'منصور': '#f59e0b', 'محمد': '#3b82f6', 'نورا': '#ef4444',
+    'اشرف': '#4f46e5', 'شرف': '#7c3aed'
 };
+function getUserColor(username) { return userColors[username] || '#6b7280'; }
+function getUserInitial(username) { return username ? username.charAt(0) : '؟'; }
 
-function getUserImage(username) {
-    if (employeesInfo[username] && employeesInfo[username].image) {
-        return employeesInfo[username].image;
-    }
-    return 'image/default.jpg';
+function createAvatarElement(username, size) {
+    const div = document.createElement('div');
+    div.className = size === 'small' ? 'msg-avatar' : 'avatar-circle';
+    div.style.background = getUserColor(username);
+    div.textContent = getUserInitial(username);
+    div.title = username;
+    return div;
 }
 
 // تحديث الهيدر
 document.getElementById('headerTitle').textContent = '💬 ' + currentUser.username;
-document.getElementById('myAvatar').src = getUserImage(currentUser.username);
 if (currentUser.role === 'admin') {
     document.getElementById('headerSubtitle').textContent = '👑 مشرف';
 }
+const myAvatarContainer = document.getElementById('myAvatarContainer');
+myAvatarContainer.style.background = getUserColor(currentUser.username);
+myAvatarContainer.textContent = getUserInitial(currentUser.username);
 
 // ===== مؤشر الاتصال =====
-const connectedRef = firebase.database().ref(".info/connected");
-connectedRef.on("value", snap => {
-    document.getElementById('connectionIndicator').className = 
+firebase.database().ref(".info/connected").on("value", snap => {
+    document.getElementById('connectionIndicator').className =
         'connection-dot ' + (snap.val() === true ? 'online' : 'offline');
 });
 
-// ===== العودة للتقويم =====
+// ===== العودة =====
 function goBack() {
-    if (window.opener && !window.opener.closed) {
-        window.opener.focus();
-        window.close();
-    } else {
-        window.location.href = 'index.html';
-    }
+    if (window.opener && !window.opener.closed) { window.opener.focus(); window.close(); }
+    else window.location.href = 'index.html';
 }
 
 // ===== المتغيرات =====
 const messagesArea = document.getElementById('messagesArea');
 const messageInput = document.getElementById('messageInput');
-let replyTo = null; // { key, sender, text }
-let contextMessageKey = null;
-let reactionTargetKey = null;
+let replyTo = null, contextMessageKey = null, reactionTargetKey = null;
 const loadedMessages = new Set();
+let pendingImageData = null;
 
-// ===== إرسال بالضغط على Enter =====
 messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        sendMessage();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
 });
 
 // ===== تحميل الرسائل =====
@@ -569,81 +367,42 @@ db.ref('chat/general').on('child_added', snap => {
     appendMessage(snap.key, snap.val());
     scrollToBottom();
 });
-
 db.ref('chat/general').on('child_changed', snap => {
-    const existing = document.getElementById('msg-' + snap.key);
-    if (existing) {
-        existing.remove();
-        loadedMessages.delete(snap.key);
-    }
+    const el = document.getElementById('msg-' + snap.key);
+    if (el) { el.remove(); loadedMessages.delete(snap.key); }
     appendMessage(snap.key, snap.val());
 });
-
 db.ref('chat/general').on('child_removed', snap => {
     const el = document.getElementById('msg-' + snap.key);
-    if (el) {
-        el.style.transition = 'all 0.3s';
-        el.style.opacity = '0';
-        el.style.transform = 'scale(0.8)';
-        setTimeout(() => el.remove(), 300);
-    }
+    if (el) { el.style.transition = 'all 0.3s'; el.style.opacity = '0'; el.style.transform = 'scale(0.8)'; setTimeout(() => el.remove(), 300); }
     loadedMessages.delete(snap.key);
 });
 
-// ===== إرسال رسالة =====
+// ===== إرسال =====
 function sendMessage() {
     const text = messageInput.value.trim();
-    const hasText = text.length > 0;
-    const hasImage = pendingImageData !== null;
-
-    if (!hasText && !hasImage) return;
+    if (!text && !pendingImageData) return;
 
     const message = {
-        sender: currentUser.username,
-        senderId: currentUser.id,
-        senderImage: getUserImage(currentUser.username),
+        sender: currentUser.username, senderId: currentUser.id,
         time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
         timestamp: firebase.database.ServerValue.TIMESTAMP,
-        isAdmin: currentUser.role === 'admin',
-        edited: false,
-        reactions: {}
+        isAdmin: currentUser.role === 'admin', edited: false, reactions: {}
     };
-
-    if (hasText) message.text = text;
-    if (hasImage) {
-        message.image = pendingImageData;
-        pendingImageData = null;
-    }
-    if (replyTo) {
-        message.replyTo = {
-            key: replyTo.key,
-            sender: replyTo.sender,
-            text: replyTo.text
-        };
-        cancelReply();
-    }
+    if (text) message.text = text;
+    if (pendingImageData) { message.image = pendingImageData; pendingImageData = null; }
+    if (replyTo) { message.replyTo = { key: replyTo.key, sender: replyTo.sender, text: replyTo.text }; cancelReply(); }
 
     db.ref('chat/general').push(message);
     messageInput.value = '';
 }
 
-// ===== إرفاق صورة =====
-let pendingImageData = null;
 function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-        alert('حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت');
-        event.target.value = '';
-        return;
-    }
-
+    if (file.size > 5 * 1024 * 1024) { alert('حجم الصورة كبير جداً (أقصى حد 5 ميجابايت)'); event.target.value = ''; return; }
     const reader = new FileReader();
-    reader.onload = (e) => {
-        pendingImageData = e.target.result;
-        sendMessage();
-    };
+    reader.onload = (e) => { pendingImageData = e.target.result; sendMessage(); };
     reader.readAsDataURL(file);
     event.target.value = '';
 }
@@ -651,21 +410,17 @@ function handleImageUpload(event) {
 // ===== عرض رسالة =====
 function appendMessage(key, msg) {
     if (document.getElementById('msg-' + key)) return;
-
     const isSent = msg.sender === currentUser.username;
     const row = document.createElement('div');
     row.className = `message-row ${isSent ? 'sent' : 'received'}`;
     row.id = 'msg-' + key;
 
-    const avatar = document.createElement('img');
-    avatar.className = 'msg-avatar';
-    avatar.src = msg.senderImage || getUserImage(msg.sender);
-    avatar.alt = msg.sender;
-    avatar.onerror = () => { avatar.src = 'image/default.jpg'; };
+    // أفاتار
+    const avatar = createAvatarElement(msg.sender, 'small');
+    row.appendChild(avatar);
 
     const content = document.createElement('div');
     content.className = 'msg-content';
-
     if (!isSent) {
         const nameDiv = document.createElement('div');
         nameDiv.className = 'msg-sender-name';
@@ -676,22 +431,16 @@ function appendMessage(key, msg) {
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
 
+    // رد
     if (msg.replyTo) {
-        const replyPreview = document.createElement('div');
-        replyPreview.className = 'reply-preview';
-        replyPreview.innerHTML = `
-            <span class="reply-sender">${msg.replyTo.sender}</span>
-            <div class="reply-text">${msg.replyTo.text || '📷 صورة'}</div>
-        `;
-        replyPreview.onclick = () => {
+        const rp = document.createElement('div');
+        rp.className = 'reply-preview';
+        rp.innerHTML = `<span class="reply-sender">${msg.replyTo.sender}</span><div class="reply-text">${msg.replyTo.text || '📷 صورة'}</div>`;
+        rp.onclick = () => {
             const target = document.getElementById('msg-' + msg.replyTo.key);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.style.background = '#fef3c7';
-                setTimeout(() => target.style.background = '', 2000);
-            }
+            if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); target.style.background = '#fef3c7'; setTimeout(() => target.style.background = '', 2000); }
         };
-        bubble.appendChild(replyPreview);
+        bubble.appendChild(rp);
     }
 
     if (msg.text) {
@@ -700,12 +449,9 @@ function appendMessage(key, msg) {
         textDiv.textContent = msg.text;
         bubble.appendChild(textDiv);
     }
-
     if (msg.image) {
         const img = document.createElement('img');
-        img.className = 'msg-image';
-        img.src = msg.image;
-        img.loading = 'lazy';
+        img.className = 'msg-image'; img.src = msg.image; img.loading = 'lazy';
         img.onclick = () => {
             document.getElementById('overlayImage').src = msg.image;
             document.getElementById('imageOverlay').classList.remove('hidden');
@@ -716,24 +462,17 @@ function appendMessage(key, msg) {
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
     timeDiv.textContent = msg.time || '';
-
     const actionsBtn = document.createElement('button');
-    actionsBtn.className = 'msg-actions-btn';
-    actionsBtn.innerHTML = '⋮';
-    actionsBtn.title = 'خيارات';
-    actionsBtn.onclick = (e) => {
-        e.stopPropagation();
-        showContextMenu(e, key, msg);
-    };
+    actionsBtn.className = 'msg-actions-btn'; actionsBtn.innerHTML = '⋮';
+    actionsBtn.onclick = (e) => { e.stopPropagation(); showContextMenu(e, key, msg); };
     timeDiv.appendChild(actionsBtn);
-
     bubble.appendChild(timeDiv);
     content.appendChild(bubble);
 
+    // الريأكشنات
+    const reactionsRow = document.createElement('div');
+    reactionsRow.className = 'reactions-row';
     if (msg.reactions && Object.keys(msg.reactions).length > 0) {
-        const reactionsRow = document.createElement('div');
-        reactionsRow.className = 'reactions-row';
-
         Object.entries(msg.reactions).forEach(([emoji, users]) => {
             if (users && users.length > 0) {
                 const chip = document.createElement('span');
@@ -745,44 +484,23 @@ function appendMessage(key, msg) {
                 reactionsRow.appendChild(chip);
             }
         });
-
-        const addBtn = document.createElement('span');
-        addBtn.className = 'add-reaction-btn';
-        addBtn.textContent = '+';
-        addBtn.onclick = (e) => {
-            e.stopPropagation();
-            showReactionPicker(e, key);
-        };
-        reactionsRow.appendChild(addBtn);
-
-        content.appendChild(reactionsRow);
-    } else {
-        const addBtn = document.createElement('span');
-        addBtn.className = 'add-reaction-btn';
-        addBtn.textContent = '😀';
-        addBtn.style.marginTop = '2px';
-        addBtn.onclick = (e) => {
-            e.stopPropagation();
-            showReactionPicker(e, key);
-        };
-        content.appendChild(addBtn);
     }
+    // زر القلب الرمادي (يظهر دائماً)
+    const addBtn = document.createElement('span');
+    addBtn.className = 'add-reaction-btn';
+    addBtn.innerHTML = '🤍';
+    addBtn.title = 'إضافة تفاعل';
+    addBtn.onclick = (e) => { e.stopPropagation(); showReactionPicker(e, key); };
+    reactionsRow.appendChild(addBtn);
+    content.appendChild(reactionsRow);
 
-    bubble.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showContextMenu(e, key, msg);
-    });
-    let longPressTimer;
-    bubble.addEventListener('touchstart', () => {
-        longPressTimer = setTimeout(() => {
-            const touchEvent = new Event('contextmenu');
-            bubble.dispatchEvent(touchEvent);
-        }, 600);
-    });
-    bubble.addEventListener('touchend', () => clearTimeout(longPressTimer));
-    bubble.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+    // ضغط مطول
+    bubble.addEventListener('contextmenu', (e) => { e.preventDefault(); showContextMenu(e, key, msg); });
+    let timer;
+    bubble.addEventListener('touchstart', () => { timer = setTimeout(() => { const ev = new Event('contextmenu'); bubble.dispatchEvent(ev); }, 600); });
+    bubble.addEventListener('touchend', () => clearTimeout(timer));
+    bubble.addEventListener('touchmove', () => clearTimeout(timer));
 
-    row.appendChild(avatar);
     row.appendChild(content);
     messagesArea.appendChild(row);
 }
@@ -791,80 +509,49 @@ function appendMessage(key, msg) {
 function showContextMenu(e, key, msg) {
     contextMessageKey = key;
     const menu = document.getElementById('contextMenu');
-    const editBtn = document.getElementById('ctxEditBtn');
-    const deleteBtn = document.getElementById('ctxDeleteBtn');
-
-    const canModify = msg.sender === currentUser.username || currentUser.role === 'admin';
-    editBtn.classList.toggle('hidden', !canModify || !msg.text);
-    deleteBtn.classList.toggle('hidden', !canModify);
-
-    menu.dataset.msgKey = key;
+    document.getElementById('ctxEditBtn').classList.toggle('hidden', !((msg.sender === currentUser.username || currentUser.role === 'admin') && msg.text));
+    document.getElementById('ctxDeleteBtn').classList.toggle('hidden', !(msg.sender === currentUser.username || currentUser.role === 'admin'));
     menu.classList.remove('hidden');
-    
-    let left = e.pageX || e.touches?.[0]?.pageX || 100;
-    let top = e.pageY || e.touches?.[0]?.pageY || 200;
-    
+    let left = e.pageX || (e.touches && e.touches[0].pageX) || 100;
+    let top = e.pageY || (e.touches && e.touches[0].pageY) || 200;
     if (left + 170 > window.innerWidth) left = window.innerWidth - 180;
     if (top + 200 > window.innerHeight) top = window.innerHeight - 210;
-    
-    menu.style.left = left + 'px';
-    menu.style.top = top + 'px';
+    menu.style.left = left + 'px'; menu.style.top = top + 'px';
 }
 
 function contextAction(action) {
     const key = contextMessageKey;
-    const menu = document.getElementById('contextMenu');
-    menu.classList.add('hidden');
-
+    document.getElementById('contextMenu').classList.add('hidden');
     if (!key) return;
-
     db.ref('chat/general/' + key).once('value', snap => {
         const msg = snap.val();
         if (!msg && action !== 'delete') return;
-
         switch(action) {
             case 'reply':
-                replyTo = {
-                    key: key,
-                    sender: msg.sender,
-                    text: msg.text || '📷 صورة'
-                };
+                replyTo = { key, sender: msg.sender, text: msg.text || '📷 صورة' };
                 document.getElementById('replyBar').classList.remove('hidden');
                 document.getElementById('replyTargetName').textContent = msg.sender;
-                document.getElementById('replyTargetPreview').textContent = 
-                    (msg.text || '📷 صورة').substring(0, 40);
+                document.getElementById('replyTargetPreview').textContent = (msg.text || '📷 صورة').substring(0, 40);
                 messageInput.focus();
                 break;
-
             case 'react':
-                const msgEl = document.getElementById('msg-' + key);
-                if (msgEl) {
-                    const rect = msgEl.getBoundingClientRect();
-                    const fakeEvent = {
-                        pageX: rect.left + rect.width / 2,
-                        pageY: rect.top
-                    };
-                    reactionTargetKey = key;
-                    showReactionPicker(fakeEvent, key);
+                reactionTargetKey = key;
+                const el = document.getElementById('msg-' + key);
+                if (el) {
+                    const rect = el.getBoundingClientRect();
+                    showReactionPicker({ pageX: rect.left + rect.width/2, pageY: rect.top }, key);
                 }
                 break;
-
             case 'edit':
                 if (msg.text) {
                     const newText = prompt('تعديل الرسالة:', msg.text);
-                    if (newText !== null && newText.trim() !== '' && newText.trim() !== msg.text) {
-                        db.ref('chat/general/' + key).update({
-                            text: newText.trim(),
-                            edited: true
-                        });
+                    if (newText !== null && newText.trim() && newText.trim() !== msg.text) {
+                        db.ref('chat/general/' + key).update({ text: newText.trim(), edited: true });
                     }
                 }
                 break;
-
             case 'delete':
-                if (confirm('هل أنت متأكد من حذف هذه الرسالة؟')) {
-                    db.ref('chat/general/' + key).remove();
-                }
+                if (confirm('حذف هذه الرسالة؟')) db.ref('chat/general/' + key).remove();
                 break;
         }
     });
@@ -875,26 +562,20 @@ function showReactionPicker(e, key) {
     reactionTargetKey = key;
     const picker = document.getElementById('reactionPicker');
     picker.classList.remove('hidden');
-
-    let left = e.pageX || 150;
-    let top = (e.pageY || 200) - 70;
+    let left = e.pageX || 150, top = (e.pageY || 200) - 70;
     if (left + 220 > window.innerWidth) left = window.innerWidth - 230;
     if (top < 60) top = 60;
-
-    picker.style.left = left + 'px';
-    picker.style.top = top + 'px';
+    picker.style.left = left + 'px'; picker.style.top = top + 'px';
 }
 
 function toggleReaction(key, emoji) {
     db.ref('chat/general/' + key + '/reactions/' + emoji).transaction(users => {
-        if (users === null) return [currentUser.username];
+        if (!users) return [currentUser.username];
         if (Array.isArray(users)) {
             if (users.includes(currentUser.username)) {
                 const filtered = users.filter(u => u !== currentUser.username);
-                return filtered.length > 0 ? filtered : null;
-            } else {
-                return [...users, currentUser.username];
-            }
+                return filtered.length ? filtered : null;
+            } else return [...users, currentUser.username];
         }
         return [currentUser.username];
     });
@@ -902,37 +583,25 @@ function toggleReaction(key, emoji) {
 }
 
 document.querySelectorAll('#reactionPicker span').forEach(span => {
-    span.addEventListener('click', () => {
-        toggleReaction(reactionTargetKey, span.dataset.emoji);
-    });
+    span.addEventListener('click', () => toggleReaction(reactionTargetKey, span.dataset.emoji));
 });
 
-// ===== إلغاء الرد =====
 function cancelReply() {
     replyTo = null;
     document.getElementById('replyBar').classList.add('hidden');
 }
 
-// ===== إخفاء القوائم عند النقر بالخارج =====
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.context-menu') && !e.target.closest('.msg-actions-btn')) {
+    if (!e.target.closest('.context-menu') && !e.target.closest('.msg-actions-btn'))
         document.getElementById('contextMenu').classList.add('hidden');
-    }
-    if (!e.target.closest('.reaction-picker') && !e.target.closest('.add-reaction-btn')) {
+    if (!e.target.closest('.reaction-picker') && !e.target.closest('.add-reaction-btn'))
         document.getElementById('reactionPicker').classList.add('hidden');
-    }
 });
 
-// ===== سكرول للأسفل =====
 function scrollToBottom() {
-    requestAnimationFrame(() => {
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-    });
+    requestAnimationFrame(() => messagesArea.scrollTop = messagesArea.scrollHeight);
 }
-
-window.addEventListener('load', () => {
-    setTimeout(scrollToBottom, 500);
-});
+window.addEventListener('load', () => setTimeout(scrollToBottom, 500));
 </script>
 </body>
 </html>
