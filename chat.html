@@ -6,6 +6,7 @@
     <title>الدردشة - قناة اليمن اليوم</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 
@@ -25,21 +26,28 @@
             padding: 0;
         }
 
+        html {
+            height: 100%;
+        }
+
         body {
             font-family: 'Tajawal', sans-serif;
             background: #f0f2f5;
-            height: 100vh;
+            min-height: 100dvh;       /* ← dvh للجوال */
             width: 100%;
-            overflow: hidden;
+            /* overflow: hidden; */   /* ← حُذف */
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
+            display: flex;
+            justify-content: center;
         }
 
         .chat-wrapper {
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            min-height: 100dvh;       /* ← min-height بدل height */
+            width: 100%;
             max-width: 900px;
             margin: 0 auto;
             background: #fff;
@@ -58,6 +66,8 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
             z-index: 30;
             flex-shrink: 0;
+            position: sticky;
+            top: 0;
         }
         .header-left {
             display: flex;
@@ -124,6 +134,7 @@
             gap: 4px;
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
+            min-height: 0;            /* ← مهم للـ flex */
         }
         .messages-area::-webkit-scrollbar {
             width: 5px;
@@ -432,6 +443,8 @@
             flex-shrink: 0;
             z-index: 20;
             box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
+            position: sticky;           /* ← sticky للتأكد من الظهور */
+            bottom: 0;
         }
         .input-bar .attach-btn {
             background: none;
@@ -458,6 +471,9 @@
             transition: border-color 0.2s;
             background: #fafafa;
             min-width: 0;
+            /* تأكد من ظهوره */
+            display: block;
+            width: 100%;
         }
         .input-bar input[type="text"]:focus {
             border-color: #3b82f6;
@@ -521,7 +537,6 @@
             color: #6b7280;
             padding: 2px 8px;
             border-radius: 50%;
-            margin-right: auto;
         }
         .reply-bar .cancel-reply:hover {
             background: rgba(0,0,0,0.05);
@@ -571,6 +586,10 @@
             .input-bar {
                 padding: 8px 10px;
             }
+            /* تأكد من ظهور الإدخال على الجوال */
+            .input-bar input[type="text"] {
+                font-size: 16px; /* يمنع zoom على iOS */
+            }
         }
     </style>
 </head>
@@ -604,7 +623,7 @@
         <button class="cancel-reply" onclick="cancelReply()">✕</button>
     </div>
 
-    <!-- شريط الإدخال (خانة الكتابة) -->
+    <!-- شريط الإدخال -->
     <div class="input-bar">
         <button class="attach-btn" onclick="document.getElementById('imageInput').click()" title="إرفاق صورة">🖼️</button>
         <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
@@ -650,32 +669,14 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ===== المستخدمين (للتحقق من الجلسة) =====
-const USERS = {
-    'زكريا': { password: '111', id: 1, role: 'employee' },
-    'منصور': { password: '222', id: 2, role: 'employee' },
-    'محمد': { password: '333', id: 3, role: 'employee' },
-    'نورا': { password: '444', id: 4, role: 'employee' },
-    'اشرف': { password: 'yemen2026', id: 0, role: 'admin' },
-    'شرف': { password: '232', id: 5, role: 'admin' }
-};
-
-// ===== استعادة الجلسة الدائمة =====
+// ===== المستخدم الحالي =====
 let currentUser = null;
-const saved = localStorage.getItem('currentUser');
-if (saved) {
-    try {
-        const parsed = JSON.parse(saved);
-        if (USERS[parsed.username] && USERS[parsed.username].password === parsed.password) {
-            currentUser = { username: parsed.username, ...USERS[parsed.username] };
-        }
-    } catch(e) {
-        localStorage.removeItem('currentUser');
-    }
-}
+try {
+    currentUser = JSON.parse(localStorage.getItem('currentUserForChat'));
+} catch(e) {}
 
 if (!currentUser) {
-    alert('انتهت الجلسة. الرجاء تسجيل الدخول من الصفحة الرئيسية.');
+    alert('الرجاء تسجيل الدخول من الصفحة الرئيسية أولاً');
     window.location.href = 'index.html';
 }
 
@@ -839,6 +840,7 @@ function handleImageUpload(event) {
 
 // ===== عرض رسالة =====
 function appendMessage(key, msg) {
+    // إزالة رسالة "لا توجد رسائل" إذا كانت موجودة
     const placeholder = messagesArea.querySelector('div[style]');
     if (placeholder) placeholder.remove();
 
@@ -849,12 +851,14 @@ function appendMessage(key, msg) {
     row.className = 'message-row ' + (isSent ? 'sent' : 'received');
     row.id = 'msg-' + key;
 
+    // أفاتار
     const avatar = createAvatarElement(msg.sender, 'small');
     row.appendChild(avatar);
 
     const content = document.createElement('div');
     content.className = 'msg-content';
 
+    // اسم المرسل
     if (!isSent) {
         const nameDiv = document.createElement('div');
         nameDiv.className = 'msg-sender-name';
@@ -862,9 +866,11 @@ function appendMessage(key, msg) {
         content.appendChild(nameDiv);
     }
 
+    // فقاعة الرسالة
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
 
+    // الرد على رسالة
     if (msg.replyTo) {
         const replyPreview = document.createElement('div');
         replyPreview.className = 'reply-preview';
@@ -880,6 +886,7 @@ function appendMessage(key, msg) {
         bubble.appendChild(replyPreview);
     }
 
+    // نص الرسالة
     if (msg.text) {
         const textDiv = document.createElement('div');
         textDiv.className = 'msg-text' + (msg.edited ? ' edited-mark' : '');
@@ -887,6 +894,7 @@ function appendMessage(key, msg) {
         bubble.appendChild(textDiv);
     }
 
+    // صورة مرفقة
     if (msg.image) {
         const img = document.createElement('img');
         img.className = 'msg-image';
@@ -899,6 +907,7 @@ function appendMessage(key, msg) {
         bubble.appendChild(img);
     }
 
+    // وقت الرسالة وزر الإجراءات
     const timeDiv = document.createElement('div');
     timeDiv.className = 'msg-time';
     timeDiv.textContent = msg.time || '';
@@ -916,6 +925,7 @@ function appendMessage(key, msg) {
     bubble.appendChild(timeDiv);
     content.appendChild(bubble);
 
+    // الريأكشنات
     const reactionsRow = document.createElement('div');
     reactionsRow.className = 'reactions-row';
 
@@ -933,6 +943,7 @@ function appendMessage(key, msg) {
         });
     }
 
+    // زر إضافة ريأكشن (القلب الرمادي)
     const addBtn = document.createElement('span');
     addBtn.className = 'add-reaction-btn';
     addBtn.innerHTML = '🤍';
@@ -944,6 +955,7 @@ function appendMessage(key, msg) {
     reactionsRow.appendChild(addBtn);
     content.appendChild(reactionsRow);
 
+    // ضغط مطول لفتح القائمة
     bubble.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         showContextMenu(e, key, msg);
@@ -1083,6 +1095,7 @@ function toggleReaction(key, emoji) {
     document.getElementById('reactionPicker').classList.add('hidden');
 }
 
+// مستمع لأزرار الريأكشن
 document.querySelectorAll('#reactionPicker span').forEach(function(span) {
     span.addEventListener('click', function() {
         toggleReaction(reactionTargetKey, span.dataset.emoji);
@@ -1112,8 +1125,29 @@ function scrollToBottom() {
     });
 }
 
+// سكرول تلقائي عند تحميل الصفحة
 window.addEventListener('load', function() {
     setTimeout(scrollToBottom, 500);
+});
+
+// ===== إصلاح ظهور الإدخال على الجوال عند فتح الكيبورد =====
+window.addEventListener('resize', function() {
+    // التأكد من ظهور شريط الإدخال
+    const inputBar = document.querySelector('.input-bar');
+    if (inputBar) {
+        inputBar.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+});
+
+// عند تركيز الإدخال (فتح الكيبورد)
+messageInput.addEventListener('focus', function() {
+    setTimeout(function() {
+        scrollToBottom();
+        const inputBar = document.querySelector('.input-bar');
+        if (inputBar) {
+            inputBar.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    }, 300);
 });
 </script>
 </body>
