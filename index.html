@@ -320,7 +320,29 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
             <div id="settingsContainer" class="space-y-4 mb-6"></div>
             <button onclick="saveSettings()" class="w-full bg-green-500 text-white py-3 rounded-lg mb-6">حفظ التغييرات</button>
         </div>
-        <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl text-lg transition-all flex items-center justify-center gap-2">
+        <div class="border-t pt-6 mt-6">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">🔐 تغيير كلمة المرور</h3>
+            <button onclick="togglePasswordForm()" 
+                class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 rounded-xl transition-all mb-3">
+                🔑 تغيير كلمة المرور
+            </button>
+            <div id="passwordFormContainer" class="hidden space-y-3">
+                <input type="password" id="currentPassword" placeholder="كلمة المرور الحالية"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right">
+                <input type="password" id="newPassword" placeholder="كلمة المرور الجديدة"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right">
+                <input type="password" id="confirmNewPassword" placeholder="تأكيد كلمة المرور الجديدة"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right">
+                <div id="passwordChangeError" class="text-red-500 text-sm hidden text-center"></div>
+                <div id="passwordChangeSuccess" class="text-green-500 text-sm hidden text-center">✅ تم تغيير كلمة المرور بنجاح</div>
+                <button onclick="changePassword()" 
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all">
+                    💾 حفظ التغييرات
+                </button>
+            </div>
+        </div>
+
+        <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl text-lg transition-all flex items-center justify-center gap-2 mt-6">
             🚪 تسجيل الخروج
         </button>
     </div>
@@ -534,6 +556,18 @@ function initApp() {
         renderMobileDayView();
     });
     
+    // Load users from Firebase (for password sync across devices)
+    db.ref('users').on('value', function(snapshot) {
+        const fbUsers = snapshot.val();
+        if (fbUsers) {
+            Object.keys(fbUsers).forEach(function(username) {
+                if (USERS[username]) {
+                    USERS[username].password = fbUsers[username].password;
+                }
+            });
+        }
+    });
+
     db.ref('employees').on('value', function(snapshot) {
         const data = snapshot.val();
         if (data !== null && Array.isArray(data) && data.length > 0) {
@@ -559,6 +593,13 @@ function initApp() {
 // ===== وضع لاندسكيب =====
 let landscapeMode = false;
 function toggleLandscapeCalendar() {
+    // If not on calendar page, go to calendar first
+    const calendarPage = document.getElementById('calendarPage');
+    if (calendarPage && calendarPage.classList.contains('hidden')) {
+        showPage('calendar');
+        return;
+    }
+
     landscapeMode = !landscapeMode;
     const mainApp = document.getElementById('mainApp');
 
@@ -1005,6 +1046,86 @@ function renderSettings() {
             <input id="emp${i}" value="${e.name}" class="w-full p-3 border rounded-lg mt-1">
         </div>`;
     }).join('');
+}
+
+// ===== تبديل نموذج تغيير كلمة المرور =====
+function togglePasswordForm() {
+    const form = document.getElementById('passwordFormContainer');
+    if (form) {
+        form.classList.toggle('hidden');
+        // Clear fields when hiding
+        if (form.classList.contains('hidden')) {
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+            document.getElementById('passwordChangeError').classList.add('hidden');
+            document.getElementById('passwordChangeSuccess').classList.add('hidden');
+        }
+    }
+}
+
+// ===== تغيير كلمة المرور =====
+function changePassword() {
+    const currentPass = document.getElementById('currentPassword').value;
+    const newPass = document.getElementById('newPassword').value;
+    const confirmPass = document.getElementById('confirmNewPassword').value;
+    const errorEl = document.getElementById('passwordChangeError');
+    const successEl = document.getElementById('passwordChangeSuccess');
+
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+
+    if (!currentUser) {
+        errorEl.textContent = '❌ يجب تسجيل الدخول أولاً';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    const username = currentUser.username;
+
+    // Verify current password
+    if (USERS[username].password !== currentPass) {
+        errorEl.textContent = '❌ كلمة المرور الحالية غير صحيحة';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    // Validate new password
+    if (newPass.length < 3) {
+        errorEl.textContent = '❌ كلمة المرور الجديدة قصيرة جداً (3 أحرف على الأقل)';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        errorEl.textContent = '❌ كلمة المرور الجديدة غير متطابقة';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    // Update password in USERS object
+    USERS[username].password = newPass;
+
+    // Update localStorage
+    localStorage.setItem('currentUser', JSON.stringify({
+        username: username,
+        password: newPass
+    }));
+
+    // Save to Firebase for persistence across devices
+    db.ref('users/' + username).set({ password: newPass, role: currentUser.role, id: currentUser.id });
+
+    // Clear inputs
+    document.getElementById('currentPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmNewPassword').value = '';
+
+    successEl.classList.remove('hidden');
+    showToast('🔐 تم تغيير كلمة المرور بنجاح');
+
+    setTimeout(function() {
+        successEl.classList.add('hidden');
+    }, 3000);
 }
 
 function saveSettings() {
