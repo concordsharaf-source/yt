@@ -22,16 +22,17 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 .mobile-day-view { display: none; min-height: 100vh; overflow-x: hidden; }
 .desktop-calendar { display: block; }
 .mobile-landscape-calendar { display: none; }
-@media (max-width: 768px) and (orientation: portrait) {
-    .desktop-calendar { display: none; }
-    .mobile-day-view { display: flex; }
-    .mobile-landscape-calendar { display: none; }
+
+/* Mobile: show day view by default */
+@media (max-width: 768px) {
+    .desktop-calendar { display: none !important; }
+    .mobile-day-view { display: flex !important; }
+    .mobile-landscape-calendar { display: none !important; }
 }
-@media (max-width: 768px) and (orientation: landscape) {
-    .desktop-calendar { display: none; }
-    .mobile-day-view { display: none; }
-    .mobile-landscape-calendar { display: block; }
-}
+
+/* When landscape calendar is forced via JS */
+.show-landscape .mobile-day-view { display: none !important; }
+.show-landscape .mobile-landscape-calendar { display: block !important; }
 .employee-bg-1 { background: linear-gradient(135deg, #14532d, #22c55e); }
 .employee-bg-2 { background: linear-gradient(135deg, #78350f, #f59e0b); }
 .employee-bg-3 { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
@@ -209,7 +210,7 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
         <h1 class="text-sm font-bold whitespace-nowrap" id="welcomeMessage"></h1>
     </div>
     <div class="flex gap-2 items-center">
-        <button onclick="showPage('calendar')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="calendar" title="التقويم">🗓️</button>
+        <button onclick="toggleLandscapeCalendar()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" title="تقويم لاندسكيب">🔄</button>
         <button onclick="showPage('stats')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="stats" title="الإحصائيات">📊</button>
         <button onclick="openChatPage()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg relative" title="الدردشة">
             💬
@@ -523,6 +524,25 @@ function initApp() {
     }
 }
 
+// ===== وضع لاندسكيب =====
+let landscapeMode = false;
+function toggleLandscapeCalendar() {
+    landscapeMode = !landscapeMode;
+    const mainApp = document.getElementById('mainApp');
+
+    if (landscapeMode) {
+        // Show landscape calendar
+        mainApp.classList.add('show-landscape');
+        showToast('تقويم الشهر 📊');
+        renderLandscapeCalendar();
+    } else {
+        // Show day view (default)
+        mainApp.classList.remove('show-landscape');
+        showToast('عرض اليوم 📅');
+        renderMobileDayView();
+    }
+}
+
 // ===== التنقل بين الصفحات =====
 function showPage(page) {
     document.querySelectorAll('.page').forEach(function(p) { p.classList.add('hidden'); });
@@ -536,9 +556,22 @@ function showPage(page) {
     if (page === 'stats') renderStats();
     if (page === 'calendar') {
         mobileViewDate = new Date();
-        renderCalendar();
-        renderLandscapeCalendar();
-        renderMobileDayView();
+        const isMobile = window.innerWidth <= 768;
+        const mainApp = document.getElementById('mainApp');
+
+        // Reset to default (day view) when entering calendar page
+        landscapeMode = false;
+        if (mainApp) mainApp.classList.remove('show-landscape');
+
+        if (isMobile) {
+            // Mobile default: day view showing current presenter
+            renderMobileDayView();
+            renderLandscapeCalendar(); // pre-render for toggle
+        } else {
+            renderCalendar();
+            renderLandscapeCalendar();
+            renderMobileDayView();
+        }
     }
     if (page === 'settings') {
         const adminPanel = document.getElementById('settingsAdminPanel');
