@@ -217,7 +217,7 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
         <h1 class="text-sm font-bold whitespace-nowrap" id="welcomeMessage"></h1>
     </div>
     <div class="flex gap-2 items-center">
-        <button onclick="toggleLandscapeCalendar()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" title="تقويم لاندسكيب">🔄</button>
+        <button onclick="toggleLandscapeCalendar()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" title="التقويم">🗓️</button>
         <button onclick="showPage('stats')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="stats" title="الإحصائيات">📊</button>
         <button onclick="openChatPage()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg relative" title="الدردشة">
             💬
@@ -606,7 +606,7 @@ function toggleLandscapeCalendar() {
     if (landscapeMode) {
         // Show landscape calendar
         mainApp.classList.add('show-landscape');
-        showToast('تقويم الشهر 📊');
+        showToast('تقويم الشهر 🗓️');
         renderLandscapeCalendar();
     } else {
         // Show day view (default)
