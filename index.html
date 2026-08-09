@@ -23,14 +23,21 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 .desktop-calendar { display: block; }
 .mobile-landscape-calendar { display: none; }
 
-/* Mobile: show day view by default */
-@media (max-width: 768px) {
+/* Mobile portrait: show day view by default */
+@media (max-width: 768px) and (orientation: portrait) {
     .desktop-calendar { display: none !important; }
     .mobile-day-view { display: flex !important; }
     .mobile-landscape-calendar { display: none !important; }
 }
 
-/* When landscape calendar is forced via JS */
+/* Mobile landscape: show landscape calendar automatically */
+@media (max-width: 768px) and (orientation: landscape) {
+    .desktop-calendar { display: none !important; }
+    .mobile-day-view { display: none !important; }
+    .mobile-landscape-calendar { display: block !important; }
+}
+
+/* When landscape calendar is forced via JS in portrait */
 .show-landscape .mobile-day-view { display: none !important; }
 .show-landscape .mobile-landscape-calendar { display: block !important; }
 .employee-bg-1 { background: linear-gradient(135deg, #14532d, #22c55e); }
@@ -491,8 +498,33 @@ function openChatPage() {
 }
 
 // ===== تهيئة التطبيق =====
+// ===== تبديل تلقائي عند تدوير الشاشة =====
+function handleOrientationChange() {
+    const isMobile = window.innerWidth <= 768;
+    const isLandscape = window.innerWidth > window.innerHeight;
+    const mainApp = document.getElementById('mainApp');
+
+    if (!isMobile) return; // Only on mobile
+
+    if (isLandscape) {
+        // Rotated to landscape → show monthly calendar
+        landscapeMode = true;
+        if (mainApp) mainApp.classList.add('show-landscape');
+        renderLandscapeCalendar();
+    } else {
+        // Rotated to portrait → show day view (unless manually toggled)
+        landscapeMode = false;
+        if (mainApp) mainApp.classList.remove('show-landscape');
+        renderMobileDayView();
+    }
+}
+
 function initApp() {
     initConnectionListener();
+
+    // Auto-switch between day view and landscape calendar on orientation change
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
     
     db.ref('shifts').on('value', function(snapshot) {
         shifts = snapshot.val() || {};
