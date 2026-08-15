@@ -6,8 +6,6 @@
     <title>الدردشة - قناة اليمن اليوم</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-    <script src="config.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 
@@ -223,52 +221,41 @@
 
 <script>
 // ===== FIREBASE =====
-firebase.initializeApp(APP_CONFIG.firebaseConfig);
+const firebaseConfig = {
+  apiKey: "AIzaSyCHd1yY27vSskKuvvNZ_XmtwgoHc3lPe5k",
+  authDomain: "ytcalender-bae88.firebaseapp.com",
+  databaseURL: "https://ytcalender-bae88-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ytcalender-bae88",
+  storageBucket: "ytcalender-bae88.firebasestorage.app",
+  messagingSenderId: "625139846676",
+  appId: "1:625139846676:web:691be456f3f31e6572e101"
+};
+firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ===== المستخدمون: مصدر واحد من config.js =====
-const USERS = APP_CONFIG.users;
+const USERS = {
+    'زكريا': { password: '111', id: 1, role: 'employee' },
+    'منصور': { password: '222', id: 2, role: 'employee' },
+    'محمد': { password: '333', id: 3, role: 'employee' },
+    'نورا': { password: '444', id: 4, role: 'employee' },
+    'اشرف': { password: 'yemen2026', id: 0, role: 'admin' },
+    'شرف': { password: '232', id: 5, role: 'admin' }
+};
 
-// ===== معرف هذا الجهاز (لإهمال رسائله المرسلة من هنا)
-function getDeviceId() {
-    let id = localStorage.getItem('deviceId');
-    if (!id) {
-        const arr = new Uint8Array(16);
-        crypto.getRandomValues(arr);
-        id = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-        localStorage.setItem('deviceId', id);
-    }
-    return id;
-}
-
-// ===== التحقق من الجلسة =====
-// 1) أولاً: hash كلمة المرور المحفوظة مع المستخدمين
-// 2) إن لم يتوفر hash: رمز الجلسة في Firebase (sessions) — يتيح فتح الدردشة دون إعادة إدخال كلمة المرور
 let currentUser = null;
-(async function verifySession() {
-    const saved = localStorage.getItem('currentUser');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            const u = USERS[parsed.username];
-            if (u) {
-                if (u.passwordHash && parsed.passwordHash === u.passwordHash) {
-                    currentUser = { username: parsed.username, ...u };
-                } else if (parsed.sessionToken) {
-                    // تحقق من رمز الجلسة في Firebase
-                    const sess = await db.ref('sessions/' + parsed.username).once('value');
-                    if (sess.val() && sess.val().sessionToken === parsed.sessionToken) {
-                        currentUser = { username: parsed.username, ...u };
-                    }
-                }
-            }
-        } catch(e) {}
-    }
-    if (!currentUser) {
-        alert('انتهت الجلسة. الرجاء تسجيل الدخول من الصفحة الرئيسية.');
-        window.location.href = 'index.html';
-    }
-})();
+const saved = localStorage.getItem('currentUser');
+if (saved) {
+    try {
+        const parsed = JSON.parse(saved);
+        if (USERS[parsed.username] && USERS[parsed.username].password === parsed.password) {
+            currentUser = { username: parsed.username, ...USERS[parsed.username] };
+        }
+    } catch(e) {}
+}
+if (!currentUser) {
+    alert('انتهت الجلسة. الرجاء تسجيل الدخول من الصفحة الرئيسية.');
+    window.location.href = 'index.html';
+}
 
 const userColors = {
     'زكريا': '#22c55e', 'منصور': '#f59e0b', 'محمد': '#3b82f6', 'نورا': '#ef4444',
@@ -296,14 +283,6 @@ firebase.database().ref(".info/connected").on("value", snap => {
 });
 
 function goBack() {
-    // تحديث العلامة المائية قبل الخروج: كل الرسائل التي شاهدناها في نافذة
-    // الدردشة يجب ألا تُعدّ "جديدة" لاحقاً في الصفحة الرئيسية
-    try {
-        const session = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        if (session.username) {
-            localStorage.setItem('lastChatTimestamp_' + session.username, String(Date.now()));
-        }
-    } catch(e) {}
     if (window.opener && !window.opener.closed) { window.opener.focus(); window.close(); }
     else window.location.href = 'index.html';
 }
@@ -311,6 +290,7 @@ function goBack() {
 const messagesArea = document.getElementById('messagesArea');
 const messageInput = document.getElementById('messageInput');
 let replyTo = null, contextMessageKey = null, reactionTargetKey = null;
+let pendingImageData = null;
 const loadedMessages = new Set();
 
 messageInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
@@ -332,46 +312,17 @@ db.ref('chat/general').on('child_removed', snap => {
     loadedMessages.delete(snap.key);
 });
 
-// رفع الصور إلى Firebase Storage بدل تخزينها كـ Base64 في قاعدة البيانات
-// (تجنب حد 5MB لكل رسالة وتسريع تحميل الدردشة)
-const storage = firebase.storage();
-let pendingImageData = null, pendingImageName = null;
-
-async function sendMessage() {
+function sendMessage() {
     const text = messageInput.value.trim();
     if (!text && !pendingImageData) return;
-    if (!currentUser) return;
-
-    let imageUrl = null;
-    if (pendingImageData) {
-        try {
-            // إظهار حالة الرفع
-            const sendBtn = document.querySelector('.send-btn');
-            const prevText = sendBtn.textContent;
-            sendBtn.textContent = '⏳';
-            sendBtn.disabled = true;
-            // رفع الصورة إلى Storage وتخزين الرابط فقط
-            const ref = storage.ref('chat/' + currentUser.username + '/' + pendingImageName);
-            const snapshot = await ref.putString(pendingImageData, 'data_url');
-            imageUrl = await snapshot.ref.getDownloadURL();
-            sendBtn.textContent = prevText;
-            sendBtn.disabled = false;
-        } catch(e) {
-            alert('فشل رفع الصورة: ' + (e.message || e));
-            return;
-        }
-    }
-    pendingImageData = null; pendingImageName = null;
-
     const msg = {
         sender: currentUser.username, senderId: currentUser.id,
-        deviceId: getDeviceId(),
         time: new Date().toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}),
         timestamp: firebase.database.ServerValue.TIMESTAMP,
         isAdmin: currentUser.role === 'admin', edited: false, reactions: {}
     };
     if (text) msg.text = text;
-    if (imageUrl) msg.imageUrl = imageUrl;
+    if (pendingImageData) { msg.image = pendingImageData; pendingImageData = null; }
     if (replyTo) { msg.replyTo = { key: replyTo.key, sender: replyTo.sender, text: replyTo.text }; cancelReply(); }
     db.ref('chat/general').push(msg);
     messageInput.value = '';
@@ -380,14 +331,9 @@ async function sendMessage() {
 function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    if (file.size > 10*1024*1024) { alert('حجم الصورة كبير جداً (الحد الأقصى 10MB)'); return; }
+    if (file.size > 5*1024*1024) { alert('حجم الصورة كبير جداً'); return; }
     const reader = new FileReader();
-    reader.onload = e => {
-        pendingImageData = e.target.result;
-        // اسم ملف فريد يمنع التعارض بين الصور المتشابهة
-        pendingImageName = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + (file.type.split('/')[1] || 'jpg');
-        sendMessage();
-    };
+    reader.onload = e => { pendingImageData = e.target.result; sendMessage(); };
     reader.readAsDataURL(file);
     event.target.value = '';
 }
@@ -427,12 +373,10 @@ function appendMessage(key, msg) {
         textDiv.textContent = msg.text;
         bubble.appendChild(textDiv);
     }
-    // دعم الصور القديمة (msg.image) والجديدة المخزنة في Storage (msg.imageUrl)
-    if (msg.image || msg.imageUrl) {
-        const src = msg.imageUrl || msg.image;
+    if (msg.image) {
         const img = document.createElement('img');
-        img.className = 'msg-image'; img.src = src; img.loading='lazy';
-        img.onclick = () => { document.getElementById('overlayImage').src = src; document.getElementById('imageOverlay').classList.remove('hidden'); };
+        img.className = 'msg-image'; img.src = msg.image; img.loading='lazy';
+        img.onclick = () => { document.getElementById('overlayImage').src = msg.image; document.getElementById('imageOverlay').classList.remove('hidden'); };
         bubble.appendChild(img);
     }
     const timeDiv = document.createElement('div');

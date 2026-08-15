@@ -9,6 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
+<script src="config.js"></script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
@@ -217,9 +218,9 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
         <h1 class="text-sm font-bold whitespace-nowrap" id="welcomeMessage"></h1>
     </div>
     <div class="flex gap-2 items-center">
-        <button onclick="toggleLandscapeCalendar()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" title="التقويم">🗓️</button>
+        <button onclick="toggleLandscapeCalendar()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="calendar" title="التقويم">🗓️</button>
         <button onclick="showPage('stats')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="stats" title="الإحصائيات">📊</button>
-        <button onclick="openChatPage()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg relative" title="الدردشة">
+        <button onclick="openChatPage()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg relative" data-page="chat" title="الدردشة">
             💬
             <span id="chatBadge" class="chat-badge hidden">0</span>
         </button>
@@ -368,27 +369,25 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 
 <script>
 // ===== FIREBASE =====
-const firebaseConfig = {
-  apiKey: "AIzaSyCHd1yY27vSskKuvvNZ_XmtwgoHc3lPe5k",
-  authDomain: "ytcalender-bae88.firebaseapp.com",
-  databaseURL: "https://ytcalender-bae88-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "ytcalender-bae88",
-  storageBucket: "ytcalender-bae88.firebasestorage.app",
-  messagingSenderId: "625139846676",
-  appId: "1:625139846676:web:691be456f3f31e6572e101"
-};
-firebase.initializeApp(firebaseConfig);
+firebase.initializeApp(APP_CONFIG.firebaseConfig);
 const db = firebase.database();
 
 // ===== المستخدمين =====
-const USERS = {
-    'زكريا': { password: '111', id: 1, role: 'employee' },
-    'منصور': { password: '222', id: 2, role: 'employee' },
-    'محمد': { password: '333', id: 3, role: 'employee' },
-    'نورا': { password: '444', id: 4, role: 'employee' },
-    'اشرف': { password: 'yemen2026', id: 0, role: 'admin' },
-    'شرف': { password: '232', id: 5, role: 'admin' }
-};
+// مصدر واحد للحقيقة: APP_CONFIG.users (من config.js) بكلمات مرور مشفرة
+const USERS = APP_CONFIG.users;
+
+// ===== رمز الجلسة =====
+// بدل تخزين كلمة المرور في localStorage، نخزن رمز جلسة عشوائي يُتحقق منه مع Firebase
+function generateSessionToken() {
+    const arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// التحقق من مطابقة كلمة المرور عبر الـ Hash
+function verifyPassword(username, password) {
+    return USERS[username] && USERS[username].passwordHash === (window.__lastHashedPassword__ || '');
+}
 
 let currentUser = null;
 let currentDate = new Date();
@@ -411,14 +410,20 @@ const arabicMonths = ['يناير','فبراير','مارس','أبريل','ما�
 const arabicDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
 // ===== الجلسة الدائمة =====
-function checkAutoLogin() {
+// تسجيل الدخول يعتمد على Hash كلمة المرور + رمز جلسة؛ لا تُخزن كلمة المرور نصاً
+let __pendingPassword__ = '';
+
+async function checkAutoLogin() {
     const saved = localStorage.getItem('currentUser');
     if (saved) {
         try {
             const user = JSON.parse(saved);
-            if (USERS[user.username] && USERS[user.username].password === user.password) {
-                performLogin(user);
-                return true;
+            if (user.username && USERS[user.username] && user.passwordHash) {
+                if (USERS[user.username].passwordHash === user.passwordHash) {
+                    // كلمة المرور ما زالت صالحة → إعادة الدخول مباشرة
+                    await performLogin({ username: user.username, password: null, fromSession: true });
+                    return true;
+                }
             }
         } catch(e) {
             localStorage.removeItem('currentUser');
@@ -427,28 +432,57 @@ function checkAutoLogin() {
     return false;
 }
 
-function performLogin(user) {
-    currentUser = { username: user.username, ...USERS[user.username] };
-    localStorage.setItem('currentUser', JSON.stringify({
-        username: user.username,
-        password: USERS[user.username].password
-    }));
+async function performLogin(user) {
+    const username = user.username;
+    const password = user.password || __pendingPassword__;
+    currentUser = { username: username, ...USERS[username] };
+
+    // إصدار رمز جلسة والتحقق من كلمة المرور
+    if (password) {
+        const hash = await hashPassword(password);
+        if (USERS[username].passwordHash !== hash) {
+            localStorage.removeItem('currentUser');
+            currentUser = null;
+            throw new Error('كلمة المرور غير صحيحة');
+        }
+        localStorage.setItem('currentUser', JSON.stringify({
+            username: username,
+            passwordHash: hash,
+            sessionToken: generateSessionToken()
+        }));
+        // حفظ رمز الجلسة في Firebase حتى تتحقق منه باقي الأجهزة (مثل صفحة الدردشة)
+        db.ref('sessions/' + username).set({ sessionToken: JSON.parse(localStorage.getItem('currentUser')).sessionToken, lastLogin: Date.now() });
+        // مزامنة الـ hash مع Firebase مرة واحدة عند الدخول (لأول مرة أو بعد تغيير كلمة المرور)
+        db.ref('users/' + username).once('value').then(function(snap) {
+            const fb = snap.val();
+            if (!fb || fb.passwordHash !== hash) {
+                db.ref('users/' + username).set({ passwordHash: hash, role: currentUser.role, id: currentUser.id });
+            }
+        });
+        __pendingPassword__ = '';
+    }
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
-    document.getElementById('welcomeMessage').textContent = `👋 مرحباً ${user.username}`;
+    document.getElementById('welcomeMessage').textContent = `👋 مرحباً ${username}`;
     initApp();
-    showToast(`مرحباً ${user.username}! 👋`);
+    showToast(`مرحباً ${username}! 👋`);
 }
 
 // ===== تسجيل الدخول =====
-function handleLogin() {
+async function handleLogin() {
     const username = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
-    
-    if (USERS[username] && USERS[username].password === password) {
-        performLogin({ username, password });
-    } else {
+
+    if (!USERS[username]) {
+        errorEl.classList.remove('hidden');
+        document.getElementById('loginPassword').value = '';
+        return;
+    }
+    __pendingPassword__ = password;
+    try {
+        await performLogin({ username, password });
+    } catch(e) {
         errorEl.classList.remove('hidden');
         document.getElementById('loginPassword').value = '';
     }
@@ -533,8 +567,10 @@ function attachChatChildAddedListener(username) {
         // تجاهل رسائلنا نحن أو الرسائل القديمة (التي وصلت قبل تسجيل الدخول)
         const isOwnMessage = msg.sender === currentUser.username;
         const isOldMessage = ts <= lastKnownChatTimestamp;
+        // تجاهل الرسائل المرسلة من نفس هذا الجهاز حتى لو وصلنا بها من مستمع Firebase
+        const isSameDevice = msg.deviceId === getDeviceId();
 
-        if (isOldMessage || isOwnMessage || localStorage.getItem('chatWindowOpen')) {
+        if (isOldMessage || isOwnMessage || isSameDevice || localStorage.getItem('chatWindowOpen')) {
             // نحدّث المرجع حتى لا تُعدّ رسالة قديمة لاحقاً عند فتح الموقع من جديد
             lastKnownChatTimestamp = Math.max(lastKnownChatTimestamp, ts);
             localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
@@ -566,24 +602,82 @@ function notifyNewChatMessage(msg) {
             vibrate: [200, 100, 200]
         });
     } catch (e) { /* المتصفح لا يدعم الإشعارات */ }
+    // صوت تنبيه خفيف لمرة واحدة عند كل رسالة جديدة
+    playChatAlertSound();
+}
+
+// إشعار لوحة الإشعارات (يُستخدم للتذكير بالوردية والدردشة)
+function showPushNotification(title, body, tag) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+        new Notification(title, {
+            body: body,
+            icon: 'image/app-icon.png',
+            badge: 'image/app-icon.png',
+            tag: tag,
+            requireInteraction: false,
+            vibrate: [200, 100, 200]
+        });
+    } catch (e) { /* المتصفح لا يدعم الإشعارات */ }
+}
+
+// ===== صوت تنبيه الدردشة =====
+// نغمة قصيرة مدمجة (Base64) حتى لا نعتمد على ملف خارجي
+let chatAlertSound = null;
+function getChatAlertSound() {
+    if (!chatAlertSound && 'Audio' in window) {
+        try {
+            // WAV 16kHz أحادي: نغمتان قصيرتان (880Hz ثم 1100Hz)
+            chatAlertSound = new Audio("data:audio/wav;base64,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");
+        } catch(e) {}
+    }
+    return chatAlertSound;
+}
+let lastChatSoundPlay = 0;
+function playChatAlertSound() {
+    const now = Date.now();
+    if (now - lastChatSoundPlay < 2000) return; // مرة واحدة كل ثانيتين على الأقل
+    lastChatSoundPlay = now;
+    const sound = getChatAlertSound();
+    try {
+        if (sound) { sound.currentTime = 0; sound.volume = 0.6; sound.play().catch(() => {}); }
+    } catch(e) {}
+}
+
+// ===== معرف الجهاز =====
+// يُميّز جهاز المستخدم حتى لا تُحسب رسائله المرسلة من جهاز آخر كرسائل جديدة
+function getDeviceId() {
+    let id = localStorage.getItem('deviceId');
+    if (!id) {
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        id = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem('deviceId', id);
+    }
+    return id;
 }
 
 // ===== فتح الدردشة =====
 function openChatPage() {
     if (!currentUser) return;
-    localStorage.setItem('currentUser', JSON.stringify({
-        username: currentUser.username,
-        password: USERS[currentUser.username].password
-    }));
+    // صفحة الدردشة تتحقق من رمز الجلسة المخزن في Firebase (db.ref('sessions'))
     unreadChatCount = 0;
     lastKnownChatTimestamp = Date.now();
     updateChatBadge();
     localStorage.setItem('chatWindowOpen', 'true');
+    // تظليل زر الدردشة أثناء فتحها
+    document.querySelectorAll('.nav-btn').forEach(function(btn) {
+        btn.classList.toggle('bg-white/30', btn.dataset.page === 'chat');
+    });
     const chatWindow = window.open('chat.html', '_blank');
     const checkWindow = setInterval(function() {
         if (chatWindow.closed) {
             localStorage.removeItem('chatWindowOpen');
             clearInterval(checkWindow);
+            // إزالة تظليل زر الدردشة عند إغلاقها
+            document.querySelectorAll('.nav-btn').forEach(function(btn) {
+                btn.classList.toggle('bg-white/30', btn.dataset.page === 'calendar');
+            });
         }
     }, 500);
 }
@@ -625,13 +719,13 @@ function initApp() {
         renderMobileDayView();
     });
     
-    // Load users from Firebase (for password sync across devices)
+    // مزامنة كلمات المرور بين الأجهزة من Firebase (المخزنة الآن كـ Hash)
     db.ref('users').on('value', function(snapshot) {
         const fbUsers = snapshot.val();
         if (fbUsers) {
             Object.keys(fbUsers).forEach(function(username) {
-                if (USERS[username]) {
-                    USERS[username].password = fbUsers[username].password;
+                if (USERS[username] && fbUsers[username].passwordHash) {
+                    USERS[username].passwordHash = fbUsers[username].passwordHash;
                 }
             });
         }
@@ -699,10 +793,13 @@ function showPage(page) {
     document.querySelectorAll('.page').forEach(function(p) { p.classList.add('hidden'); });
     const pageEl = document.getElementById(page + 'Page');
     if (pageEl) pageEl.classList.remove('hidden');
-    
+
     document.querySelectorAll('.nav-btn').forEach(function(btn) {
         btn.classList.toggle('bg-white/30', btn.dataset.page === page);
+        // زر الدردشة يتوقف تظليله عند فتح نافذة الدردشة نفسها
+        if (page === 'chat') btn.classList.remove('bg-white/30');
     });
+    if (page === 'chat') document.getElementById('chatBadge').classList.add('hidden');
     
     if (page === 'stats') renderStats();
     if (page === 'calendar') {
@@ -1143,7 +1240,7 @@ function togglePasswordForm() {
 }
 
 // ===== تغيير كلمة المرور =====
-function changePassword() {
+async function changePassword() {
     const currentPass = document.getElementById('currentPassword').value;
     const newPass = document.getElementById('newPassword').value;
     const confirmPass = document.getElementById('confirmNewPassword').value;
@@ -1161,8 +1258,9 @@ function changePassword() {
 
     const username = currentUser.username;
 
-    // Verify current password
-    if (USERS[username].password !== currentPass) {
+    // Verify current password (بالـ Hash)
+    const currentHash = await hashPassword(currentPass);
+    if (USERS[username].passwordHash !== currentHash) {
         errorEl.textContent = '❌ كلمة المرور الحالية غير صحيحة';
         errorEl.classList.remove('hidden');
         return;
@@ -1181,17 +1279,17 @@ function changePassword() {
         return;
     }
 
-    // Update password in USERS object
-    USERS[username].password = newPass;
+    // Update password hash in USERS object
+    const newHash = await hashPassword(newPass);
+    USERS[username].passwordHash = newHash;
 
-    // Update localStorage
-    localStorage.setItem('currentUser', JSON.stringify({
-        username: username,
-        password: newPass
-    }));
+    // Update localStorage (hash فقط، لا كلمة مرور نصية)
+    const session = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    session.passwordHash = newHash;
+    localStorage.setItem('currentUser', JSON.stringify(session));
 
     // Save to Firebase for persistence across devices
-    db.ref('users/' + username).set({ password: newPass, role: currentUser.role, id: currentUser.id });
+    db.ref('users/' + username).set({ passwordHash: newHash, role: currentUser.role, id: currentUser.id });
 
     // Clear inputs
     document.getElementById('currentPassword').value = '';
@@ -1238,6 +1336,7 @@ function checkShiftNotifications() {
                 `🌟 ورديتك اليوم (${today.getDate()} ${arabicMonths[today.getMonth()]}) - جمعة مباركة! 🕌` :
                 `📋 ورديتك اليوم (${today.getDate()} ${arabicMonths[today.getMonth()]})`;
             showToast(message);
+            showPushNotification('⏰ تذكير بالوردية', message, 'shift-notification-' + key);
             localStorage.setItem('notified_' + key, 'true');
         }
     }
@@ -1246,7 +1345,9 @@ function checkShiftNotifications() {
     if (tomorrowEmployee && tomorrowEmployee.id === currentUser.id && now.getHours() >= 20) {
         const key = `tomorrow_${tomorrow.getFullYear()}-${tomorrow.getMonth()+1}-${tomorrow.getDate()}`;
         if (!localStorage.getItem('notified_' + key)) {
-            showToast(`⏰ ورديتك غداً (${tomorrow.getDate()} ${arabicMonths[tomorrow.getMonth()]})`);
+            const message = `⏰ ورديتك غداً (${tomorrow.getDate()} ${arabicMonths[tomorrow.getMonth()]})`;
+            showToast(message);
+            showPushNotification('⏰ تذكير بالوردية', message, 'shift-notification-' + key);
             localStorage.setItem('notified_' + key, 'true');
         }
     }
@@ -1264,8 +1365,8 @@ function showToast(message, type) {
 }
 
 // ===== بدء التطبيق =====
-window.addEventListener('load', function() {
-    if (!checkAutoLogin()) {
+window.addEventListener('load', async function() {
+    if (!await checkAutoLogin()) {
         document.getElementById('loginScreen').classList.remove('hidden');
     }
 });
