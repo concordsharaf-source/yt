@@ -491,13 +491,81 @@ function updateChatBadge() {
     }
 }
 
+// ===== شارة الدردشة مع إشعارات فعلية =====
+// نستخدم "علامة مائية" (watermark): لا نعدّ رسالة جديدة إلا إذا كانت أُضيفت
+// بعد آخر رسالة كانت موجودة وقت تسجيل الدخول (أو وقت آخر فتح للدردشة)
+let lastKnownChatTimestamp = 0;
+
 function startListeningForChatNotifications() {
-    db.ref('chat/general').on('child_added', function() {
-        if (!localStorage.getItem('chatWindowOpen')) {
-            unreadChatCount++;
-            updateChatBadge();
+    const username = currentUser ? currentUser.username : '';
+
+    // 1) تحميل آخر رسالة موجودة حالياً في الدردشة (الرسائل القديمة) أولاً
+    // ثم ربط مستمع الرسائل الجديدة فقط بعد استلام المرجع حتى لا تُعد الرسائل القديمة كجديدة
+    db.ref('chat/general').orderByChild('timestamp').limitToLast(1)
+        .once('value', function(snap) {
+            const val = snap.val();
+            if (val) {
+                const key = Object.keys(val)[0];
+                const ts = val[key].timestamp || Date.now();
+                // المرجع = آخر رسالة موجودة فعلاً (حتى لا تُعد القديمة كجديدة)
+                // ملاحظة: لا نستخدم max() مع القيمة المحفوظة هنا، لأن القيمة المحفوظة
+                // قد تكون زمن فتح الدردشة الأخير (Date.now()) في جهاز بقي مفتوحاً،
+                // وأي رسالة وصلت بين ذلك الحين والآن يجب أن تُعدّ جديدة
+                lastKnownChatTimestamp = ts;
+            } else if (lastKnownChatTimestamp === 0) {
+                // الدردشة فارغة تماماً: لا توجد رسائل قديمة ولا حاجة لعلامة
+                lastKnownChatTimestamp = Date.now();
+            }
+            // حفظ المرجع وبدء الاستماع فقط بعد ضمان حصولنا على العلامة المائية
+            localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+            attachChatChildAddedListener(username);
+        });
+}
+
+function attachChatChildAddedListener(username) {
+    // 2) الاستماع لأي رسالة تُضاف بعد ذلك
+    db.ref('chat/general').on('child_added', function(snap) {
+        const msg = snap.val();
+        if (!currentUser || !msg) return;
+
+        const ts = msg.timestamp || Date.now();
+
+        // تجاهل رسائلنا نحن أو الرسائل القديمة (التي وصلت قبل تسجيل الدخول)
+        const isOwnMessage = msg.sender === currentUser.username;
+        const isOldMessage = ts <= lastKnownChatTimestamp;
+
+        if (isOldMessage || isOwnMessage || localStorage.getItem('chatWindowOpen')) {
+            // نحدّث المرجع حتى لا تُعدّ رسالة قديمة لاحقاً عند فتح الموقع من جديد
+            lastKnownChatTimestamp = Math.max(lastKnownChatTimestamp, ts);
+            localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+            return;
         }
+
+        // رسالة جديدة فعلاً من شخص آخر
+        lastKnownChatTimestamp = ts;
+        localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+        unreadChatCount++;
+        updateChatBadge();
+
+        // إشعار فعلي في لوحة إشعارات الهاتف + المتصفح
+        notifyNewChatMessage(msg);
     });
+}
+
+// إشعار لوحة الإشعارات في الجوال/المتصفح
+function notifyNewChatMessage(msg) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+        const preview = msg.text ? (msg.text.length > 60 ? msg.text.substring(0, 60) + '...' : msg.text) : '📷 صورة';
+        new Notification('💬 رسالة جديدة في الدردشة', {
+            body: (msg.sender || '') + ': ' + preview,
+            icon: 'image/app-icon.png',
+            badge: 'image/app-icon.png',
+            tag: 'chat-notification-' + (msg.timestamp || Date.now()),
+            requireInteraction: false,
+            vibrate: [200, 100, 200]
+        });
+    } catch (e) { /* المتصفح لا يدعم الإشعارات */ }
 }
 
 // ===== فتح الدردشة =====
@@ -508,6 +576,7 @@ function openChatPage() {
         password: USERS[currentUser.username].password
     }));
     unreadChatCount = 0;
+    lastKnownChatTimestamp = Date.now();
     updateChatBadge();
     localStorage.setItem('chatWindowOpen', 'true');
     const chatWindow = window.open('chat.html', '_blank');
@@ -580,14 +649,23 @@ function initApp() {
     });
     
     startListeningForChatNotifications();
+
+    // استرجاع المرجع المحفوظ من آخر جلسة حتى لا تُعدّ الرسائل القديمة كجديدة
+    try {
+        const savedTs = localStorage.getItem('lastChatTimestamp_' + currentUser.username);
+        if (savedTs) lastKnownChatTimestamp = parseInt(savedTs, 10) || 0;
+    } catch(e) {}
+
+    // طلب إذن الإشعارات عند الدخول (نفس طريقة إشعار الوردية)
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
     initSwipe();
     showPage('calendar');
     setInterval(checkShiftNotifications, 60000);
     checkShiftNotifications();
     
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
 }
 
 // ===== وضع لاندسكيب =====

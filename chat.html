@@ -283,6 +283,14 @@ firebase.database().ref(".info/connected").on("value", snap => {
 });
 
 function goBack() {
+    // تحديث العلامة المائية قبل الخروج: كل الرسائل التي شاهدناها في نافذة
+    // الدردشة يجب ألا تُعدّ "جديدة" لاحقاً في الصفحة الرئيسية
+    try {
+        const session = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        if (session.username) {
+            localStorage.setItem('lastChatTimestamp_' + session.username, String(Date.now()));
+        }
+    } catch(e) {}
     if (window.opener && !window.opener.closed) { window.opener.focus(); window.close(); }
     else window.location.href = 'index.html';
 }
