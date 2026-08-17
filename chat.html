@@ -236,8 +236,19 @@
 firebase.initializeApp(APP_CONFIG.firebaseConfig);
 const db = firebase.database();
 
-// ===== المستخدمون: مصدر واحد من config.js =====
-const USERS = APP_CONFIG.users;
+// ===== المستخدمون: الثابتون في config.js + المستخدمون المضافون من الأدمن في Firebase =====
+const USERS = Object.assign({}, APP_CONFIG.users);
+(async function loadFirebaseUsers() {
+    try {
+        const snap = await db.ref('users').once('value');
+        const fb = snap.val() || {};
+        Object.keys(fb).forEach(function(u) {
+            if (!APP_CONFIG.users[u] && fb[u] && fb[u].passwordHash) {
+                USERS[u] = fb[u];
+            }
+        });
+    } catch (e) {}
+})();
 
 // ===== معرف هذا الجهاز (لإهمال رسائله المرسلة من هنا)
 function getDeviceId() {

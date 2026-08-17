@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>جدول الورديات</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1d4ed8">
+<link rel="apple-touch-icon" href="images/icon-192x192.png">
+<script src="config.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; position: relative; }
+.employee-1 { background-color:#22c55e; color:white; }
+.employee-2 { background-color:#f59e0b; color:white; }
+.employee-3 { background-color:#3b82f6; color:white; }
+.employee-4 { background-color:#ef4444; color:white; }
+.today-highlight { box-shadow: inset 0 0 0 4px #000000; }
+.modal-overlay { background-color:rgba(0,0,0,.5); backdrop-filter:blur(4px); }
+.mobile-day-view { display: none; min-height: 100vh; overflow-x: hidden; }
+.desktop-calendar { display: block; }
+.mobile-landscape-calendar { display: none; }
+
+/* Mobile portrait: show day view by default */
+@media (max-width: 768px) and (orientation: portrait) {
+    .desktop-calendar { display: none !important; }
+    .mobile-day-view { display: flex !important; }
+    .mobile-landscape-calendar { display: none !important; }
+}
+
+/* Mobile landscape: show landscape calendar automatically */
+@media (max-width: 768px) and (orientation: landscape) {
+    .desktop-calendar { display: none !important; }
+    .mobile-day-view { display: none !important; }
+    .mobile-landscape-calendar { display: block !important; }
+}
+
+/* When landscape calendar is forced via JS in portrait */
+.show-landscape .mobile-day-view { display: none !important; }
+.show-landscape .mobile-landscape-calendar { display: block !important; }
+.employee-bg-1 { background: linear-gradient(135deg, #14532d, #22c55e); }
+.employee-bg-2 { background: linear-gradient(135deg, #78350f, #f59e0b); }
+.employee-bg-3 { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
+.employee-bg-4 { background: linear-gradient(135deg, #7f1d1d, #ef4444); }
+.pulse-ring { animation: pulse-ring 2s infinite; }
+@keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(255,255,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+.friday-note-top {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    max-width: 160px;
+    z-index: 20;
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+.friday-note-enter {
+    animation: fridayNoteSlideUp 0.25s ease-out forwards;
+}
+@keyframes fridayNoteSlideUp {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+.swipe-out-right { animation: swipeOutRight 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.swipe-out-left { animation: swipeOutLeft 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.swipe-in-right { animation: swipeInRight 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.swipe-in-left { animation: swipeInLeft 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes swipeOutRight {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(80px); opacity: 0; }
+}
+@keyframes swipeOutLeft {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(-80px); opacity: 0; }
+}
+@keyframes swipeInRight {
+    0% { transform: translateX(80px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes swipeInLeft {
+    0% { transform: translateX(-80px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+.badge-pop { animation: badgePop 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes badgePop {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.number-roll { animation: numberRoll 0.25s ease-out forwards; }
+@keyframes numberRoll {
+    0% { transform: translateY(-20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+.day-card-gray { background: linear-gradient(135deg, #374151, #6b7280) !important; }
+.day-number-gray { color: #d1d5db !important; }
+.day-month-gray { color: #9ca3af !important; }
+.day-name-gray { color: #9ca3af !important; }
+.employee-card-gray { background-color: rgba(255,255,255,0.1) !important; }
+.employee-name-gray { color: #d1d5db !important; }
+.swipe-hint {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    color: rgba(255,255,255,0.3);
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+.swipe-hint-right { right: 20px; }
+.swipe-hint-left { left: 20px; }
+.swipe-hint-active { animation: hintPulse 0.4s ease-in-out; opacity: 0.8 !important; }
+@keyframes hintPulse {
+    0%, 100% { transform: translateY(-50%) scale(1); }
+    50% { transform: translateY(-50%) scale(1.4); }
+}
+.login-container { background: linear-gradient(135deg, #1e3a8a, #3b82f6, #1e40af); }
+.login-card {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+.login-input {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    transition: all 0.3s;
+}
+.login-input:focus {
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.6);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.1);
+}
+.login-input::placeholder { color: rgba(255,255,255,0.6); }
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    animation: toastIn 0.4s ease, toastOut 0.4s ease 3s forwards;
+    min-width: 300px;
+    text-align: center;
+}
+@keyframes toastIn {
+    from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+@keyframes toastOut {
+    from { opacity: 1; }
+    to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+.connection-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 4px;
+    box-shadow: 0 0 8px currentColor;
+}
+.connection-dot.online { background-color: #22c55e; box-shadow: 0 0 10px #22c55e; }
+.connection-dot.offline { background-color: #ef4444; box-shadow: 0 0 10px #ef4444; }
+.chat-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background-color: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- شاشة تسجيل الدخول -->
+<div id="loginScreen" class="login-container min-h-screen flex items-center justify-center p-4">
+    <div class="login-card rounded-3xl p-8 w-full max-w-md text-center">
+        <div class="text-6xl mb-4">📅</div>
+        <h1 class="text-3xl font-bold text-white mb-2">جدول الورديات</h1>
+        <p class="text-white/70 mb-8">قناة اليمن اليوم</p>
+        <div class="space-y-4">
+            <input type="text" id="loginUsername" placeholder="اسم المستخدم" 
+                class="login-input w-full px-4 py-3 rounded-xl outline-none text-center text-lg">
+            <input type="password" id="loginPassword" placeholder="كلمة المرور"
+                class="login-input w-full px-4 py-3 rounded-xl outline-none text-center text-lg">
+            <div id="loginError" class="text-red-300 text-sm hidden">❌ اسم المستخدم أو كلمة المرور غير صحيحة</div>
+            <button onclick="handleLogin()" 
+                class="w-full bg-white text-blue-600 font-bold py-3 rounded-xl text-lg hover:bg-gray-100 transition-all">
+                دخول
+            </button>
+        </div>
+        <p class="text-white/50 text-xs mt-6">جميع الحقوق محفوظة © 2026</p>
+    </div>
+</div>
+
+<!-- التطبيق الرئيسي -->
+<div id="mainApp" class="hidden">
+
+<!-- الهيدر -->
+<nav class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg sticky top-0 z-40">
+<div class="container mx-auto px-3 py-2">
+<div class="flex justify-between items-center">
+    <div class="flex items-center gap-2">
+        <span id="connectionIndicator" class="connection-dot offline"></span>
+        <h1 class="text-sm font-bold whitespace-nowrap" id="welcomeMessage"></h1>
+    </div>
+    <div class="flex gap-2 items-center">
+        <button onclick="toggleLandscapeCalendar()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="calendar" title="التقويم">🗓️</button>
+        <button onclick="showPage('stats')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="stats" title="الإحصائيات">📊</button>
+        <button onclick="openChatPage()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg relative" data-page="chat" title="الدردشة">
+            💬
+            <span id="chatBadge" class="chat-badge hidden">0</span>
+        </button>
+        <button onclick="showPage('settings')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="settings" title="الإعدادات">⚙️</button>
+    </div>
+</div>
+</div>
+</nav>
+
+<!-- صفحة التقويم -->
+<div id="calendarPage" class="page">
+    <div id="mobileDayView" class="mobile-day-view flex-col">
+        <div id="dayCardContainer" class="flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen">
+            <div class="swipe-hint swipe-hint-left" id="swipeHintLeft">◀</div>
+            <div class="swipe-hint swipe-hint-right" id="swipeHintRight">▶</div>
+
+            <div id="employeeCard" class="absolute top-6 left-6 bg-white/20 backdrop-blur-md rounded-3xl p-4 border border-white/30 shadow-2xl z-20">
+                <img id="employeeAvatar" src="" alt="" class="w-28 h-28 rounded-full border-4 border-white/60 shadow-xl object-cover">
+                <p id="employeeCardName" class="text-white text-center text-base font-bold mt-3"></p>
+            </div>
+
+            <div id="nextFridayNote" class="hidden friday-note-top rounded-2xl p-3 border border-white/30 shadow-xl">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xl">🕌</span>
+                    <span id="nextFridayText" class="text-white text-xs font-bold text-center leading-tight"></span>
+                </div>
+            </div>
+
+            <div class="text-center mt-20">
+                <div id="dayNumber" class="text-[70px] font-extrabold text-white drop-shadow-2xl leading-none mb-2"></div>
+                <div id="dayMonth" class="text-3xl text-white/90 font-bold mb-4"></div>
+                <div id="dayName" class="text-2xl text-white/80 mb-10"></div>
+                <div id="employeeBadge" class="inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="desktop-calendar container mx-auto px-4 py-6">
+        <div class="flex justify-between items-center mb-6 bg-white rounded-xl shadow-md p-4">
+            <button onclick="previousMonth()" class="bg-blue-500 text-white px-4 py-2 rounded-lg">السابق</button>
+            <h2 id="currentMonth" class="text-xl font-bold"></h2>
+            <button onclick="nextMonth()" class="bg-blue-500 text-white px-4 py-2 rounded-lg">التالي</button>
+        </div>
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="grid grid-cols-7 bg-gray-800 text-white">
+                <div class="p-3 text-center font-bold text-sm">السبت</div>
+                <div class="p-3 text-center font-bold text-sm">الأحد</div>
+                <div class="p-3 text-center font-bold text-sm">الإثنين</div>
+                <div class="p-3 text-center font-bold text-sm">الثلاثاء</div>
+                <div class="p-3 text-center font-bold text-sm">الأربعاء</div>
+                <div class="p-3 text-center font-bold text-sm">الخميس</div>
+                <div class="p-3 text-center font-bold text-sm">الجمعة</div>
+            </div>
+            <div id="calendarGrid" class="grid grid-cols-7 gap-px bg-gray-200"></div>
+        </div>
+        <div class="mt-6 bg-white rounded-xl shadow-md p-4">
+            <h3 class="font-bold mb-3">دليل الألوان</h3>
+            <div id="legendContainer" class="flex flex-wrap gap-3"></div>
+        </div>
+    </div>
+
+    <div class="mobile-landscape-calendar container mx-auto px-4 py-6">
+        <div class="flex justify-between items-center mb-4 bg-white rounded-xl shadow-md p-3">
+            <button onclick="previousMonth()" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm">السابق</button>
+            <h2 id="currentMonthLandscape" class="text-lg font-bold"></h2>
+            <button onclick="nextMonth()" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm">التالي</button>
+        </div>
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="grid grid-cols-7 bg-gray-800 text-white text-xs">
+                <div class="p-2 text-center font-bold">السبت</div>
+                <div class="p-2 text-center font-bold">الأحد</div>
+                <div class="p-2 text-center font-bold">الإثنين</div>
+                <div class="p-2 text-center font-bold">الثلاثاء</div>
+                <div class="p-2 text-center font-bold">الأربعاء</div>
+                <div class="p-2 text-center font-bold">الخميس</div>
+                <div class="p-2 text-center font-bold">الجمعة</div>
+            </div>
+            <div id="calendarGridLandscape" class="grid grid-cols-7 gap-px bg-gray-200"></div>
+        </div>
+    </div>
+</div>
+
+<!-- صفحة الإحصائيات -->
+<div id="statsPage" class="page hidden container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-6">📊 إحصائيات الورديات</h2>
+        <p id="statsMonth"></p>
+        <div id="statsContainer" class="space-y-4"></div>
+    </div>
+</div>
+
+<!-- صفحة الإعدادات -->
+<div id="settingsPage" class="page hidden container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-6">⚙️ الإعدادات</h2>
+        <div id="settingsAdminPanel" class="hidden">
+            <p class="text-gray-600 mb-4">تعديل أسماء الموظفين:</p>
+            <div id="settingsContainer" class="space-y-4 mb-6"></div>
+            <button onclick="saveSettings()" class="w-full bg-green-500 text-white py-3 rounded-lg mb-6">حفظ التغييرات</button>
+        </div>
+        <div id="usersAdminSection" class="hidden border-t pt-6 mt-6">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">👥 إدارة المستخدمين</h3>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                <p class="text-sm font-bold mb-3">➕ إضافة مستخدم جديد</p>
+                <input type="text" id="newUsername" placeholder="اسم المستخدم" maxlength="30"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right mb-2">
+                <input type="password" id="newUserPassword" placeholder="كلمة المرور الأولية" maxlength="30"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right mb-2">
+                <select id="newUserRole" class="w-full p-3 border border-gray-300 rounded-lg text-right mb-2 bg-white">
+                    <option value="employee">موظف عادي</option>
+                    <option value="admin">أدمن (مشرف)</option>
+                </select>
+                <div id="addUserError" class="text-red-500 text-sm hidden text-center mb-2"></div>
+                <button onclick="addNewUser()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl transition-all">
+                    ➕ إضافة المستخدم
+                </button>
+            </div>
+            <div id="usersListContainer" class="space-y-2"></div>
+        </div>
+        <div class="border-t pt-6 mt-6">
+            <h3 class="text-lg font-bold mb-4 text-gray-800">🔐 تغيير كلمة المرور</h3>
+            <button onclick="togglePasswordForm()" 
+                class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 rounded-xl transition-all mb-3">
+                🔑 تغيير كلمة المرور
+            </button>
+            <div id="passwordFormContainer" class="hidden space-y-3">
+                <input type="password" id="currentPassword" placeholder="كلمة المرور الحالية"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right">
+                <input type="password" id="newPassword" placeholder="كلمة المرور الجديدة"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right">
+                <input type="password" id="confirmNewPassword" placeholder="تأكيد كلمة المرور الجديدة"
+                    class="w-full p-3 border border-gray-300 rounded-lg text-right">
+                <div id="passwordChangeError" class="text-red-500 text-sm hidden text-center"></div>
+                <div id="passwordChangeSuccess" class="text-green-500 text-sm hidden text-center">✅ تم تغيير كلمة المرور بنجاح</div>
+                <button onclick="changePassword()" 
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all">
+                    💾 حفظ التغييرات
+                </button>
+            </div>
+        </div>
+
+        <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl text-lg transition-all flex items-center justify-center gap-2 mt-6">
+            🚪 تسجيل الخروج
+        </button>
+    </div>
+</div>
+
+<!-- مودال تعديل الوردية -->
+<div id="employeeModal" class="fixed inset-0 z-50 hidden">
+    <div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 w-80">
+        <h3 class="text-xl font-bold mb-4">اختر الموظف</h3>
+        <p id="selectedDateText" class="mb-4 text-gray-600"></p>
+        <div id="employeeOptions" class="space-y-2"></div>
+        <div class="mt-4 flex gap-2">
+            <button onclick="clearAssignment()" class="flex-1 bg-red-500 text-white py-2 rounded-lg">حذف</button>
+            <button onclick="closeModal()" class="flex-1 bg-gray-300 py-2 rounded-lg">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+</div><!-- نهاية mainApp -->
+
+<div id="toastContainer" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;"></div>
+
+<script>
+// ===== FIREBASE =====
+firebase.initializeApp(APP_CONFIG.firebaseConfig);
+const db = firebase.database();
+
+// ===== المستخدمين =====
+// مصدر واحد للحقيقة: APP_CONFIG.users (من config.js) بكلمات مرور مشفرة
+const USERS = APP_CONFIG.users;
+
+// ===== رمز الجلسة =====
+// بدل تخزين كلمة المرور في localStorage، نخزن رمز جلسة عشوائي يُتحقق منه مع Firebase
+function generateSessionToken() {
+    const arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// التحقق من مطابقة كلمة المرور عبر الـ Hash
+function verifyPassword(username, password) {
+    return USERS[username] && USERS[username].passwordHash === (window.__lastHashedPassword__ || '');
+}
+
+let currentUser = null;
+let currentDate = new Date();
+let selectedDay = null;
+let mobileViewDate = new Date();
+let touchStartX = 0, touchEndX = 0, isAnimating = false;
+let unreadChatCount = 0;
+
+const defaultEmployees = [
+    { id: 1, name: 'زكريا', color: 'employee-1', bgClass: 'employee-bg-1', image: 'image/1.jpg' },
+    { id: 2, name: 'منصور', color: 'employee-2', bgClass: 'employee-bg-2', image: 'image/2.jpg' },
+    { id: 3, name: 'محمد', color: 'employee-3', bgClass: 'employee-bg-3', image: 'image/3.jpg' },
+    { id: 4, name: 'نورا', color: 'employee-4', bgClass: 'employee-bg-4', image: 'image/4.jpg' }
+];
+let employees = JSON.parse(JSON.stringify(defaultEmployees));
+let shifts = {};
+let firebaseReady = false;
+
+const arabicMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const arabicDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+// ===== الجلسة الدائمة =====
+// تسجيل الدخول يعتمد على Hash كلمة المرور + رمز جلسة؛ لا تُخزن كلمة المرور نصاً
+let __pendingPassword__ = '';
+
+async function checkAutoLogin() {
+    const saved = localStorage.getItem('currentUser');
+    if (saved) {
+        try {
+            const user = JSON.parse(saved);
+            if (user.username && USERS[user.username] && user.passwordHash) {
+                if (USERS[user.username].passwordHash === user.passwordHash) {
+                    // كلمة المرور ما زالت صالحة → إعادة الدخول مباشرة
+                    await performLogin({ username: user.username, password: null, fromSession: true });
+                    return true;
+                }
+            }
+        } catch(e) {
+            localStorage.removeItem('currentUser');
+        }
+    }
+    return false;
+}
+
+async function performLogin(user) {
+    const username = user.username;
+    const password = user.password || __pendingPassword__;
+    currentUser = { username: username, ...USERS[username] };
+
+    // إصدار رمز جلسة والتحقق من كلمة المرور
+    if (password) {
+        const hash = await hashPassword(password);
+        if (USERS[username].passwordHash !== hash) {
+            localStorage.removeItem('currentUser');
+            currentUser = null;
+            throw new Error('كلمة المرور غير صحيحة');
+        }
+        localStorage.setItem('currentUser', JSON.stringify({
+            username: username,
+            passwordHash: hash,
+            sessionToken: generateSessionToken()
+        }));
+        // حفظ رمز الجلسة في Firebase حتى تتحقق منه باقي الأجهزة (مثل صفحة الدردشة)
+        db.ref('sessions/' + username).set({ sessionToken: JSON.parse(localStorage.getItem('currentUser')).sessionToken, lastLogin: Date.now() });
+        // مزامنة الـ hash مع Firebase مرة واحدة عند الدخول (لأول مرة أو بعد تغيير كلمة المرور)
+        db.ref('users/' + username).once('value').then(function(snap) {
+            const fb = snap.val();
+            if (!fb || fb.passwordHash !== hash) {
+                db.ref('users/' + username).set({ passwordHash: hash, role: currentUser.role, id: currentUser.id });
+            }
+        });
+        __pendingPassword__ = '';
+    }
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    document.getElementById('welcomeMessage').textContent = `👋 مرحباً ${username}`;
+    initApp();
+    showToast(`مرحباً ${username}! 👋`);
+}
+
+// ===== تسجيل الدخول =====
+async function handleLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+
+    if (!USERS[username]) {
+        errorEl.textContent = '❌ اسم المستخدم غير صحيح، تأكد من كتابة الاسم كما هو مسجل';
+        errorEl.classList.remove('hidden');
+        __pendingPassword__ = '';
+        document.getElementById('loginPassword').value = '';
+        return;
+    }
+    if (!password) {
+        errorEl.textContent = '❌ الرجاء إدخال كلمة المرور';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+    __pendingPassword__ = password;
+    try {
+        await performLogin({ username, password });
+    } catch(e) {
+        // رفض الدخول: كلمة المرور غير صحيحة - لا نقبل المحاولة التالية بكلمة فارغة أبداً
+        __pendingPassword__ = '';
+        errorEl.textContent = '❌ كلمة المرور غير صحيحة لـ ' + username + '، حاول مرة أخرى';
+        errorEl.classList.remove('hidden');
+        document.getElementById('loginPassword').value = '';
+    }
+}
+
+// ===== تسجيل الخروج =====
+function logout() {
+    currentUser = null;
+    localStorage.removeItem('currentUser');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('mainApp').classList.add('hidden');
+    document.getElementById('loginUsername').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('settingsAdminPanel').classList.add('hidden');
+    const usersAdminSection = document.getElementById('usersAdminSection');
+    if (usersAdminSection) usersAdminSection.classList.add('hidden');
+}
+
+// ===== مؤشر الاتصال =====
+function initConnectionListener() {
+    const connectedRef = firebase.database().ref(".info/connected");
+    const indicator = document.getElementById('connectionIndicator');
+    connectedRef.on("value", function(snap) {
+        if (snap.val() === true) {
+            indicator.className = "connection-dot online";
+            indicator.title = "متصل";
+        } else {
+            indicator.className = "connection-dot offline";
+            indicator.title = "غير متصل";
+        }
+    });
+}
+
+// ===== شارة الدردشة =====
+function updateChatBadge() {
+    const badge = document.getElementById('chatBadge');
+    if (unreadChatCount > 0) {
+        badge.textContent = unreadChatCount > 99 ? '99+' : unreadChatCount;
+        badge.classList.remove('hidden');
+    } else {
+        badge.textContent = "0"; badge.classList.add('hidden');
+    }
+}
+
+// ===== شارة الدردشة مع إشعارات فعلية =====
+// نستخدم "علامة مائية" (watermark): لا نعدّ رسالة جديدة إلا إذا كانت أُضيفت
+// بعد آخر رسالة كانت موجودة وقت تسجيل الدخول (أو وقت آخر فتح للدردشة)
+let lastKnownChatTimestamp = 0;
+
+function startListeningForChatNotifications() {
+    const username = currentUser ? currentUser.username : '';
+
+    // 1) تحميل آخر رسالة موجودة حالياً في الدردشة (الرسائل القديمة) أولاً
+    // ثم ربط مستمع الرسائل الجديدة فقط بعد استلام المرجع حتى لا تُعد الرسائل القديمة كجديدة
+    db.ref('chat/general').orderByChild('timestamp').limitToLast(1)
+        .once('value', function(snap) {
+            const val = snap.val();
+            if (val) {
+                const key = Object.keys(val)[0];
+                const ts = val[key].timestamp || Date.now();
+                // المرجع = آخر رسالة موجودة فعلاً (حتى لا تُعد القديمة كجديدة)
+                // ملاحظة: لا نستخدم max() مع القيمة المحفوظة هنا، لأن القيمة المحفوظة
+                // قد تكون زمن فتح الدردشة الأخير (Date.now()) في جهاز بقي مفتوحاً،
+                // وأي رسالة وصلت بين ذلك الحين والآن يجب أن تُعدّ جديدة
+                lastKnownChatTimestamp = ts;
+            } else if (lastKnownChatTimestamp === 0) {
+                // الدردشة فارغة تماماً: لا توجد رسائل قديمة ولا حاجة لعلامة
+                lastKnownChatTimestamp = Date.now();
+            }
+            // حفظ المرجع وبدء الاستماع فقط بعد ضمان حصولنا على العلامة المائية
+            localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+            attachChatChildAddedListener(username);
+        });
+}
+
+function attachChatChildAddedListener(username) {
+    // 2) الاستماع لأي رسالة تُضاف بعد ذلك
+    db.ref('chat/general').on('child_added', function(snap) {
+        const msg = snap.val();
+        if (!currentUser || !msg) return;
+
+        const ts = msg.timestamp || Date.now();
+
+        // تجاهل رسائلنا نحن أو الرسائل القديمة (التي وصلت قبل تسجيل الدخول)
+        const isOwnMessage = msg.sender === currentUser.username;
+        const isOldMessage = ts <= lastKnownChatTimestamp;
+        // تجاهل الرسائل المرسلة من نفس هذا الجهاز حتى لو وصلنا بها من مستمع Firebase
+        const isSameDevice = msg.deviceId === getDeviceId();
+
+        if (isOldMessage || isOwnMessage || isSameDevice || localStorage.getItem('chatWindowOpen')) {
+            // نحدّث المرجع حتى لا تُعدّ رسالة قديمة لاحقاً عند فتح الموقع من جديد
+            lastKnownChatTimestamp = Math.max(lastKnownChatTimestamp, ts);
+            localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+            return;
+        }
+
+        // رسالة جديدة فعلاً من شخص آخر
+        lastKnownChatTimestamp = ts;
+        localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+        unreadChatCount++;
+        updateChatBadge();
+
+        // إشعار فعلي في لوحة إشعارات الهاتف + المتصفح
+        notifyNewChatMessage(msg);
+    });
+}
+
+// إشعار لوحة الإشعارات في الجوال/المتصفح
+function notifyNewChatMessage(msg) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+        const preview = msg.text ? (msg.text.length > 60 ? msg.text.substring(0, 60) + '...' : msg.text) : '📷 صورة';
+        showPushNotification('💬 رسالة جديدة في الدردشة', (msg.sender || '') + ': ' + preview, 'chat-notification-' + (msg.timestamp || Date.now()));
+    } catch (e) { /* المتصفح لا يدعم الإشعارات */ }
+    // صوت تنبيه خفيف لمرة واحدة عند كل رسالة جديدة
+    playChatAlertSound();
+}
+
+// إشعار لوحة الإشعارات (يُستخدم للتذكير بالوردية والدردشة)
+// الأولوية: إرساله عبر الـ Service Worker (يعمل مع التبويب في الخلفية وأيضاً بعد الإغلاق في بعض الحالات)
+// ثم عبر Notification API المباشر كطريقة احتياطية
+function showPushNotification(title, body, tag) {
+    // حتى لو كانت إشعارات لوحة الهاتف غير مفعّلة، نعرض توست داخل التطبيق لضمان وصول المعلومة
+    showToast(title + ' — ' + body);
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const payload = { type: 'notify', title: title, body: body, tag: tag || 'ytcal-notification' };
+    let sentViaSW = false;
+    try {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage(payload);
+            sentViaSW = true;
+        }
+    } catch (e) {}
+    if (sentViaSW) return;
+    try {
+        new Notification(title, {
+            body: body,
+            icon: APP_CONFIG.appIconPath,
+            badge: APP_CONFIG.appIconPath,
+            tag: tag || 'ytcal-notification',
+            silent: false,
+            renotify: true,
+            requireInteraction: false,
+            vibrate: [200, 100, 200]
+        });
+    } catch (e) { /* المتصفح لا يدعم الإشعارات */ }
+}
+
+// ===== صوت تنبيه الدردشة =====
+// نغمة قصيرة مدمجة (Base64) حتى لا نعتمد على ملف خارجي
+let chatAlertSound = null;
+function getChatAlertSound() {
+    if (!chatAlertSound && 'Audio' in window) {
+        try {
+            // WAV 16kHz أحادي: نغمتان قصيرتان (880Hz ثم 1100Hz)
+            chatAlertSound = new Audio("data:audio/wav;base64,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");
+        } catch(e) {}
+    }
+    return chatAlertSound;
+}
+let lastChatSoundPlay = 0;
+function playChatAlertSound() {
+    const now = Date.now();
+    if (now - lastChatSoundPlay < 2000) return; // مرة واحدة كل ثانيتين على الأقل
+    lastChatSoundPlay = now;
+    const sound = getChatAlertSound();
+    try {
+        if (sound) { sound.currentTime = 0; sound.volume = 0.6; sound.play().catch(() => {}); }
+    } catch(e) {}
+}
+
+// ===== معرف الجهاز =====
+// يُميّز جهاز المستخدم حتى لا تُحسب رسائله المرسلة من جهاز آخر كرسائل جديدة
+function getDeviceId() {
+    let id = localStorage.getItem('deviceId');
+    if (!id) {
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        id = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem('deviceId', id);
+    }
+    return id;
+}
+
+// ===== فتح الدردشة =====
+function openChatPage() {
+    if (!currentUser) return;
+    // صفحة الدردشة تتحقق من رمز الجلسة المخزن في Firebase (db.ref('sessions'))
+    unreadChatCount = 0;
+    lastKnownChatTimestamp = Date.now();
+    updateChatBadge();
+    localStorage.setItem('chatWindowOpen', 'true');
+    // تظليل زر الدردشة أثناء فتحها
+    document.querySelectorAll('.nav-btn').forEach(function(btn) {
+        btn.classList.toggle('bg-white/30', btn.dataset.page === 'chat');
+    });
+    const chatWindow = window.open('chat.html', '_blank');
+    const checkWindow = setInterval(function() {
+        if (chatWindow.closed) {
+            localStorage.removeItem('chatWindowOpen');
+            clearInterval(checkWindow);
+            // إزالة تظليل زر الدردشة عند إغلاقها
+            document.querySelectorAll('.nav-btn').forEach(function(btn) {
+                btn.classList.toggle('bg-white/30', btn.dataset.page === 'calendar');
+            });
+        }
+    }, 500);
+}
+
+// ===== تهيئة التطبيق =====
+// ===== تبديل تلقائي عند تدوير الشاشة =====
+function handleOrientationChange() {
+    const isMobile = window.innerWidth <= 768;
+    const isLandscape = window.innerWidth > window.innerHeight;
+    const mainApp = document.getElementById('mainApp');
+
+    if (!isMobile) return; // Only on mobile
+
+    if (isLandscape) {
+        // Rotated to landscape → show monthly calendar
+        landscapeMode = true;
+        if (mainApp) mainApp.classList.add('show-landscape');
+        renderLandscapeCalendar();
+    } else {
+        // Rotated to portrait → show day view (unless manually toggled)
+        landscapeMode = false;
+        if (mainApp) mainApp.classList.remove('show-landscape');
+        renderMobileDayView();
+    }
+}
+
+function initApp() {
+    initConnectionListener();
+
+    // Auto-switch between day view and landscape calendar on orientation change
+    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    db.ref('shifts').on('value', function(snapshot) {
+        shifts = snapshot.val() || {};
+        firebaseReady = true;
+        renderCalendar();
+        renderLandscapeCalendar();
+        renderMobileDayView();
+    });
+    
+    // مزامنة كلمات المرور بين الأجهزة من Firebase (المخزنة الآن كـ Hash)
+    db.ref('users').on('value', function(snapshot) {
+        const fbUsers = snapshot.val();
+        if (fbUsers) {
+            Object.keys(fbUsers).forEach(function(username) {
+                if (USERS[username] && fbUsers[username].passwordHash) {
+                    USERS[username].passwordHash = fbUsers[username].passwordHash;
+                }
+            });
+        }
+    });
+
+    db.ref('employees').on('value', function(snapshot) {
+        const data = snapshot.val();
+        if (data !== null && Array.isArray(data) && data.length > 0) {
+            employees = data;
+        }
+        renderLegend();
+        if (currentUser && currentUser.role === 'admin') {
+            renderSettings();
+        }
+    });
+    
+    startListeningForChatNotifications();
+
+    // استرجاع المرجع المحفوظ من آخر جلسة حتى لا تُعدّ الرسائل القديمة كجديدة
+    try {
+        const savedTs = localStorage.getItem('lastChatTimestamp_' + currentUser.username);
+        if (savedTs) lastKnownChatTimestamp = parseInt(savedTs, 10) || 0;
+    } catch(e) {}
+
+    initSwipe();
+    showPage('calendar');
+    setInterval(checkShiftNotifications, 60000);
+    checkShiftNotifications();
+    
+}
+
+// ===== وضع لاندسكيب =====
+let landscapeMode = false;
+function toggleLandscapeCalendar() {
+    // If not on calendar page, go to calendar first
+    const calendarPage = document.getElementById('calendarPage');
+    if (calendarPage && calendarPage.classList.contains('hidden')) {
+        showPage('calendar');
+        return;
+    }
+
+    landscapeMode = !landscapeMode;
+    const mainApp = document.getElementById('mainApp');
+
+    if (landscapeMode) {
+        // Show landscape calendar
+        mainApp.classList.add('show-landscape');
+        showToast('تقويم الشهر 🗓️');
+        renderLandscapeCalendar();
+    } else {
+        // Show day view (default)
+        mainApp.classList.remove('show-landscape');
+        showToast('عرض اليوم 📅');
+        renderMobileDayView();
+    }
+}
+
+// ===== التنقل بين الصفحات =====
+function showPage(page) {
+    document.querySelectorAll('.page').forEach(function(p) { p.classList.add('hidden'); });
+    const pageEl = document.getElementById(page + 'Page');
+    if (pageEl) pageEl.classList.remove('hidden');
+
+    document.querySelectorAll('.nav-btn').forEach(function(btn) {
+        btn.classList.toggle('bg-white/30', btn.dataset.page === page);
+        // زر الدردشة يتوقف تظليله عند فتح نافذة الدردشة نفسها
+        if (page === 'chat') btn.classList.remove('bg-white/30');
+    });
+    if (page === 'chat') document.getElementById('chatBadge').classList.add('hidden');
+    
+    if (page === 'stats') renderStats();
+    if (page === 'calendar') {
+        mobileViewDate = new Date();
+        const isMobile = window.innerWidth <= 768;
+        const mainApp = document.getElementById('mainApp');
+
+        // Reset to default (day view) when entering calendar page
+        landscapeMode = false;
+        if (mainApp) mainApp.classList.remove('show-landscape');
+
+        if (isMobile) {
+            // Mobile default: day view showing current presenter
+            renderMobileDayView();
+            renderLandscapeCalendar(); // pre-render for toggle
+        } else {
+            renderCalendar();
+            renderLandscapeCalendar();
+            renderMobileDayView();
+        }
+    }
+    if (page === 'settings') {
+        const adminPanel = document.getElementById('settingsAdminPanel');
+        const usersAdminSection = document.getElementById('usersAdminSection');
+        if (currentUser && currentUser.role === 'admin') {
+            adminPanel.classList.remove('hidden');
+            renderSettings();
+            if (usersAdminSection) {
+                usersAdminSection.classList.remove('hidden');
+                syncAdminUsers();
+                renderUsersList();
+            }
+        } else {
+            adminPanel.classList.add('hidden');
+            if (usersAdminSection) usersAdminSection.classList.add('hidden');
+        }
+    }
+}
+
+// ===== الورديات =====
+function getEmployeeForDate(date) {
+    const startDate = new Date(2026, 7, 1);
+    const currentDay = new Date(date);
+    const dayOfWeek = currentDay.getDay();
+    const key = `${currentDay.getFullYear()}-${currentDay.getMonth()+1}-${currentDay.getDate()}`;
+    
+    if (shifts[key]) return employees.find(function(e) { return e.id === shifts[key]; }) || null;
+    
+    let employeeId = null;
+    if (dayOfWeek === 6) employeeId = 1;
+    else if (dayOfWeek === 0) employeeId = 2;
+    else if (dayOfWeek === 1) employeeId = 3;
+    else if (dayOfWeek === 2) employeeId = 4;
+    else if (dayOfWeek === 3) {
+        let count = 0, temp = new Date(startDate);
+        while (temp <= currentDay) {
+            if (temp.getDay() === 3) count++;
+            temp.setDate(temp.getDate() + 1);
+        }
+        employeeId = (count % 2 === 1) ? 1 : 4;
+    }
+    else if (dayOfWeek === 4) {
+        let count = 0, temp = new Date(startDate);
+        while (temp <= currentDay) {
+            if (temp.getDay() === 4) count++;
+            temp.setDate(temp.getDate() + 1);
+        }
+        employeeId = (count % 2 === 1) ? 3 : 2;
+    }
+    else if (dayOfWeek === 5) {
+        let count = 0, temp = new Date(startDate);
+        while (temp <= currentDay) {
+            if (temp.getDay() === 5) count++;
+            temp.setDate(temp.getDate() + 1);
+        }
+        let mod = count % 4;
+        if (mod === 1) employeeId = 4;
+        else if (mod === 2) employeeId = 2;
+        else if (mod === 3) employeeId = 1;
+        else employeeId = 3;
+    }
+    return employees.find(function(e) { return e.id === employeeId; }) || null;
+}
+
+function getNextFriday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    let daysUntil = (5 - day + 7) % 7;
+    if (daysUntil === 0) daysUntil = 7;
+    d.setDate(d.getDate() + daysUntil);
+    return d;
+}
+
+// ===== السحب =====
+function initSwipe() {
+    const container = document.getElementById('dayCardContainer');
+    if (!container) return;
+    
+    container.addEventListener('touchstart', function(e) {
+        if (isAnimating) return;
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    container.addEventListener('touchend', function(e) {
+        if (isAnimating) return;
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+}
+
+function handleSwipe() {
+    const diff = touchEndX - touchStartX;
+    if (Math.abs(diff) > 50 && !isAnimating) {
+        isAnimating = true;
+        const container = document.getElementById('dayCardContainer');
+        const isNextDay = diff > 0;
+        const outClass = isNextDay ? 'swipe-out-right' : 'swipe-out-left';
+        const inClass = isNextDay ? 'swipe-in-left' : 'swipe-in-right';
+        
+        flashSwipeHint(isNextDay ? 'right' : 'left');
+        container.classList.add(outClass);
+        
+        setTimeout(function() {
+            if (isNextDay) mobileViewDate.setDate(mobileViewDate.getDate() + 1);
+            else mobileViewDate.setDate(mobileViewDate.getDate() - 1);
+            renderMobileDayView();
+            container.classList.remove(outClass);
+            requestAnimationFrame(function() {
+                container.classList.add(inClass);
+                animateContentElements();
+                setTimeout(function() { container.classList.remove(inClass); isAnimating = false; }, 250);
+            });
+        }, 200);
+    }
+}
+
+function flashSwipeHint(direction) {
+    const hint = document.getElementById(direction === 'right' ? 'swipeHintRight' : 'swipeHintLeft');
+    if (hint) {
+        hint.classList.add('swipe-hint-active');
+        setTimeout(function() { hint.classList.remove('swipe-hint-active'); }, 400);
+    }
+}
+
+function animateContentElements() {
+    ['dayNumber', 'dayMonth', 'dayName', 'employeeBadge'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) { el.style.animation = 'none'; el.offsetHeight; }
+    });
+    
+    const fridayNote = document.getElementById('nextFridayNote');
+    if (fridayNote && !fridayNote.classList.contains('hidden')) {
+        fridayNote.classList.add('friday-note-enter');
+        setTimeout(function() { fridayNote.classList.remove('friday-note-enter'); }, 250);
+    }
+    
+    const dayNumber = document.getElementById('dayNumber');
+    if (dayNumber) { dayNumber.classList.add('number-roll'); setTimeout(function() { dayNumber.classList.remove('number-roll'); }, 250); }
+    
+    setTimeout(function() {
+        ['dayMonth', 'dayName'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) { el.style.opacity = '0'; requestAnimationFrame(function() { el.style.transition = 'opacity 0.15s ease'; el.style.opacity = '1'; }); }
+        });
+    }, 50);
+    
+    setTimeout(function() {
+        const badge = document.getElementById('employeeBadge');
+        if (badge) { badge.classList.add('badge-pop'); setTimeout(function() { badge.classList.remove('badge-pop'); }, 300); }
+    }, 100);
+}
+
+// ===== عرض الجوال =====
+function renderMobileDayView() {
+    const viewDate = new Date(mobileViewDate);
+    const today = new Date();
+    const isToday = viewDate.toDateString() === today.toDateString();
+    const employee = getEmployeeForDate(viewDate);
+    
+    document.getElementById('dayNumber').textContent = viewDate.getDate();
+    document.getElementById('dayMonth').textContent = arabicMonths[viewDate.getMonth()] + ' ' + viewDate.getFullYear();
+    document.getElementById('dayName').textContent = arabicDays[viewDate.getDay()];
+    
+    const badge = document.getElementById('employeeBadge');
+    const cardContainer = document.getElementById('dayCardContainer');
+    const avatar = document.getElementById('employeeAvatar');
+    const cardName = document.getElementById('employeeCardName');
+    
+    cardContainer.className = 'flex-1 flex flex-col justify-center items-center p-6 relative min-h-screen';
+    document.getElementById('dayNumber').className = 'text-[120px] font-extrabold drop-shadow-2xl leading-none mb-2';
+    document.getElementById('dayMonth').className = 'text-3xl font-bold mb-4';
+    document.getElementById('dayName').className = 'text-2xl mb-10';
+    
+    if (employee) {
+        if (isToday) {
+            badge.textContent = employee.name;
+            badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring ' + employee.color;
+            cardContainer.classList.add(employee.bgClass);
+            document.getElementById('dayNumber').classList.add('text-white');
+            document.getElementById('dayMonth').classList.add('text-white/90');
+            document.getElementById('dayName').classList.add('text-white/80');
+        } else {
+            badge.textContent = employee.name;
+            badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl bg-gray-600 text-gray-200';
+            cardContainer.classList.add('day-card-gray');
+            document.getElementById('dayNumber').classList.add('day-number-gray');
+            document.getElementById('dayMonth').classList.add('day-month-gray');
+            document.getElementById('dayName').classList.add('day-name-gray');
+        }
+        avatar.src = employee.image;
+        avatar.alt = employee.name;
+        cardName.textContent = employee.name;
+        document.getElementById('employeeCard').style.display = 'block';
+    } else {
+        badge.textContent = 'لا يوجد تعيين';
+        badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl ' + (isToday ? 'bg-gray-500 text-white' : 'bg-gray-600 text-gray-300');
+        document.getElementById('employeeCard').style.display = 'none';
+        if (isToday) {
+            document.getElementById('dayNumber').classList.add('text-white');
+            document.getElementById('dayMonth').classList.add('text-white/90');
+            document.getElementById('dayName').classList.add('text-white/80');
+        } else {
+            cardContainer.classList.add('day-card-gray');
+            document.getElementById('dayNumber').classList.add('day-number-gray');
+            document.getElementById('dayMonth').classList.add('day-month-gray');
+            document.getElementById('dayName').classList.add('day-name-gray');
+        }
+    }
+    
+    const nextFriday = getNextFriday(viewDate);
+    const nextFridayEmployee = getEmployeeForDate(nextFriday);
+    const noteDiv = document.getElementById('nextFridayNote');
+    if (viewDate.getDay() === 5 && nextFridayEmployee) {
+        document.getElementById('nextFridayText').textContent = 'الجمعة القادمة\n' + nextFriday.getDate() + ' ' + arabicMonths[nextFriday.getMonth()] + '\n' + nextFridayEmployee.name;
+        noteDiv.classList.remove('hidden');
+    } else {
+        noteDiv.classList.add('hidden');
+    }
+}
+
+// ===== التقويم =====
+function autoFillMonth() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    let changed = false;
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+        const currentDay = new Date(year, month, day);
+        const employee = getEmployeeForDate(currentDay);
+        if (employee) {
+            const key = `${year}-${month+1}-${day}`;
+            if (!shifts[key]) {
+                shifts[key] = employee.id;
+                changed = true;
+            }
+        }
+    }
+    if (changed && firebaseReady) {
+        db.ref('shifts').set(shifts);
+    }
+}
+
+function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('currentMonth').textContent = arabicMonths[month] + ' ' + year;
+    autoFillMonth();
+    
+    const grid = document.getElementById('calendarGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    const firstDay = (new Date(year, month, 1).getDay() + 1) % 7;
+    const days = new Date(year, month+1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+    
+    for (let i = 0; i < firstDay; i++) {
+        grid.appendChild(Object.assign(document.createElement('div'), { className: 'bg-gray-50 min-h-[90px]' }));
+    }
+    
+    for (let day = 1; day <= days; day++) {
+        const key = `${year}-${month+1}-${day}`;
+        const emp = employees.find(function(e) { return e.id === shifts[key]; });
+        const cell = document.createElement('div');
+        cell.className = `min-h-[90px] p-2 ${emp ? emp.color : 'bg-white'} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
+        if (currentUser && currentUser.role === 'admin') cell.onclick = function() { openModal(day); };
+        
+        const number = document.createElement('div');
+        number.className = emp ? 'text-white font-bold' : 'font-bold text-gray-800';
+        number.textContent = day;
+        cell.appendChild(number);
+        
+        if (emp) {
+            const name = document.createElement('div');
+            name.className = 'text-white mt-2 text-xl font-bold';
+            name.textContent = emp.name;
+            cell.appendChild(name);
+        }
+        grid.appendChild(cell);
+    }
+}
+
+function renderLandscapeCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('currentMonthLandscape').textContent = arabicMonths[month] + ' ' + year;
+    autoFillMonth();
+    
+    const grid = document.getElementById('calendarGridLandscape');
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    const firstDay = (new Date(year, month, 1).getDay() + 1) % 7;
+    const days = new Date(year, month+1, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+    
+    for (let i = 0; i < firstDay; i++) {
+        grid.appendChild(Object.assign(document.createElement('div'), { className: 'bg-gray-50 min-h-[60px]' }));
+    }
+    
+    for (let day = 1; day <= days; day++) {
+        const key = `${year}-${month+1}-${day}`;
+        const emp = employees.find(function(e) { return e.id === shifts[key]; });
+        const cell = document.createElement('div');
+        cell.className = `min-h-[60px] p-1 ${emp ? emp.color : 'bg-white'} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
+        if (currentUser && currentUser.role === 'admin') cell.onclick = function() { openModal(day); };
+        
+        const number = document.createElement('div');
+        number.className = emp ? 'text-white font-bold text-xs' : 'font-bold text-gray-800 text-xs';
+        number.textContent = day;
+        cell.appendChild(number);
+        
+        if (emp) {
+            const name = document.createElement('div');
+            name.className = 'text-white mt-1 text-sm font-bold';
+            name.textContent = emp.name;
+            cell.appendChild(name);
+        }
+        grid.appendChild(cell);
+    }
+}
+
+function renderLegend() {
+    const container = document.getElementById('legendContainer');
+    if (container) container.innerHTML = employees.map(function(e) { return `<div class="flex items-center gap-2"><div class="w-4 h-4 rounded ${e.color}"></div><span>${e.name}</span></div>`; }).join('');
+}
+
+function previousMonth() {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+    renderLandscapeCalendar();
+}
+
+function nextMonth() {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+    renderLandscapeCalendar();
+}
+
+function openModal(day) {
+    selectedDay = day;
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('selectedDateText').textContent = `${day} ${arabicMonths[month]} ${year}`;
+    document.getElementById('employeeOptions').innerHTML = employees.map(function(e) { return `<button onclick="assignEmployee(${e.id})" class="w-full p-3 rounded-lg ${e.color}">${e.name}</button>`; }).join('');
+    document.getElementById('employeeModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('employeeModal').classList.add('hidden');
+    selectedDay = null;
+}
+
+function assignEmployee(id) {
+    const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
+    shifts[key] = id;
+    db.ref('shifts').set(shifts);
+    renderCalendar();
+    renderLandscapeCalendar();
+    renderMobileDayView();
+    closeModal();
+    showToast('تم تعديل الوردية');
+}
+
+function clearAssignment() {
+    const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
+    delete shifts[key];
+    db.ref('shifts').set(shifts);
+    renderCalendar();
+    renderLandscapeCalendar();
+    renderMobileDayView();
+    closeModal();
+    showToast('تم حذف الوردية');
+}
+
+// ===== الإحصائيات =====
+function renderStats() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('statsMonth').textContent = `إحصائيات شهر ${arabicMonths[month]} ${year}`;
+    
+    let counts = {};
+    employees.forEach(function(e) { counts[e.id] = 0; });
+    const prefix = `${year}-${month+1}-`;
+    Object.entries(shifts).forEach(function([key, id]) {
+        if (key.startsWith(prefix) && counts[id] !== undefined) counts[id]++;
+    });
+    
+    document.getElementById('statsContainer').innerHTML = employees.map(function(e) {
+        return `<div class="p-4 rounded-lg ${e.color} text-white flex justify-between items-center">
+            <span class="font-bold text-lg">${e.name}</span>
+            <span class="text-2xl font-bold">${counts[e.id]} وردية</span>
+        </div>`;
+    }).join('');
+}
+
+// ===== الإعدادات =====
+function renderSettings() {
+    if (!document.getElementById('settingsContainer')) return;
+    document.getElementById('settingsContainer').innerHTML = employees.map(function(e, i) {
+        return `<div>
+            <label class="text-sm text-gray-500">الموظف ${i+1}</label>
+            <input id="emp${i}" value="${e.name}" class="w-full p-3 border rounded-lg mt-1">
+        </div>`;
+    }).join('');
+}
+
+// ===== تبديل نموذج تغيير كلمة المرور =====
+function togglePasswordForm() {
+    const form = document.getElementById('passwordFormContainer');
+    if (form) {
+        form.classList.toggle('hidden');
+        // Clear fields when hiding
+        if (form.classList.contains('hidden')) {
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+            document.getElementById('passwordChangeError').classList.add('hidden');
+            document.getElementById('passwordChangeSuccess').classList.add('hidden');
+        }
+    }
+}
+
+// ===== تغيير كلمة المرور =====
+async function changePassword() {
+    const currentPass = document.getElementById('currentPassword').value;
+    const newPass = document.getElementById('newPassword').value;
+    const confirmPass = document.getElementById('confirmNewPassword').value;
+    const errorEl = document.getElementById('passwordChangeError');
+    const successEl = document.getElementById('passwordChangeSuccess');
+
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+
+    if (!currentUser) {
+        errorEl.textContent = '❌ يجب تسجيل الدخول أولاً';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    const username = currentUser.username;
+
+    // Verify current password (بالـ Hash)
+    const currentHash = await hashPassword(currentPass);
+    if (USERS[username].passwordHash !== currentHash) {
+        errorEl.textContent = '❌ كلمة المرور الحالية غير صحيحة';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    // Validate new password
+    if (newPass.length < 3) {
+        errorEl.textContent = '❌ كلمة المرور الجديدة قصيرة جداً (3 أحرف على الأقل)';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        errorEl.textContent = '❌ كلمة المرور الجديدة غير متطابقة';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+
+    // Update password hash in USERS object
+    const newHash = await hashPassword(newPass);
+    USERS[username].passwordHash = newHash;
+
+    // Update localStorage (hash فقط، لا كلمة مرور نصية)
+    const session = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    session.passwordHash = newHash;
+    localStorage.setItem('currentUser', JSON.stringify(session));
+
+    // Save to Firebase for persistence across devices
+    db.ref('users/' + username).set({ passwordHash: newHash, role: currentUser.role, id: currentUser.id });
+
+    // Clear inputs
+    document.getElementById('currentPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmNewPassword').value = '';
+
+    successEl.classList.remove('hidden');
+    showToast('🔐 تم تغيير كلمة المرور بنجاح');
+
+    setTimeout(function() {
+        successEl.classList.add('hidden');
+    }, 3000);
+}
+
+// ===== إدارة المستخدمين (للمشرف): إضافة أدمن/موظف من داخل التطبيق =====
+let usersCache = {};
+
+function getUsersList() {
+    // المستخدمون = الثابتون في config.js + أي مستخدمين أضافهم الأدمن وحُفظوا في Firebase
+    const merged = {};
+    Object.keys(APP_CONFIG.users).forEach(function(u) {
+        merged[u] = Object.assign({}, APP_CONFIG.users[u]);
+    });
+    Object.keys(usersCache).forEach(function(u) {
+        if (!merged[u]) merged[u] = usersCache[u];
+    });
+    return merged;
+}
+
+function renderUsersList() {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    const container = document.getElementById('usersListContainer');
+    if (!container) return;
+    const users = getUsersList();
+    let html = '';
+    Object.keys(users).forEach(function(u) {
+        const isMe = u === currentUser.username;
+        const isAdmin = users[u].role === 'admin';
+        html += '<div class="flex items-center justify-between bg-gray-50 border rounded-lg p-3">' +
+            '<div class="flex items-center gap-2">' +
+            '<span class="text-sm font-bold">' + u + '</span>' +
+            '<span class="text-xs px-2 py-1 rounded-full ' + (isAdmin ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700') + '">' + (isAdmin ? 'أدمن' : 'موظف') + '</span>' +
+            (isMe ? '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">أنا</span>' : '') +
+            '</div>' +
+            '<div class="flex gap-1">' +
+            (isMe ? '' :
+                '<button onclick="toggleUserRole(\'' + u.replace(/'/g, "\\'") + '\')" class="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg">' + (isAdmin ? 'تحويل لموظف' : 'تحويل لأدمن') + '</button>' +
+                '<button onclick="removeUser(\'' + u.replace(/'/g, "\\'") + '\')" class="text-xs bg-red-500 text-white px-3 py-1 rounded-lg">حذف</button>') +
+            '</div></div>';
+    });
+    container.innerHTML = html || '<p class="text-gray-400 text-sm text-center">لا يوجد مستخدمون</p>';
+}
+
+async function addNewUser() {
+    const errorEl = document.getElementById('addUserError');
+    const name = document.getElementById('newUsername').value.trim();
+    const pass = document.getElementById('newUserPassword').value;
+    const role = document.getElementById('newUserRole').value;
+    errorEl.classList.add('hidden');
+    if (!currentUser || currentUser.role !== 'admin') {
+        errorEl.textContent = '❌ هذه الخاصية للمشرفين فقط'; errorEl.classList.remove('hidden'); return;
+    }
+    if (!name || name.length < 2) {
+        errorEl.textContent = '❌ أدخل اسماً صحيحاً (حرفان على الأقل)'; errorEl.classList.remove('hidden'); return;
+    }
+    if (pass.length < 3) {
+        errorEl.textContent = '❌ كلمة المرور الأولية قصيرة (3 أحرف على الأقل)'; errorEl.classList.remove('hidden'); return;
+    }
+    if (getUsersList()[name]) {
+        errorEl.textContent = '❌ هذا الاسم مستخدم بالفعل'; errorEl.classList.remove('hidden'); return;
+    }
+    const users = getUsersList();
+    let maxId = 0;
+    Object.keys(users).forEach(function(u) { if ((users[u].id || 0) > maxId) maxId = users[u].id; });
+    const hash = await hashPassword(pass);
+    const newUser = { id: maxId + 1, role: role, passwordHash: hash, addedByAdmin: true };
+    try {
+        await db.ref('users/' + name).set(newUser);
+    } catch (e) {
+        errorEl.textContent = '❌ فشل الحفظ، تأكد من اتصالك بالإنترنت'; errorEl.classList.remove('hidden'); return;
+    }
+    USERS[name] = newUser;
+    // تفريغ الحقول وتحديث القائمة
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newUserPassword').value = '';
+    renderUsersList();
+    showToast('✅ تمت إضافة المستخدم ' + name + ' (' + (role === 'admin' ? 'أدمن' : 'موظف') + ')');
+}
+
+async function toggleUserRole(username) {
+    const users = getUsersList();
+    if (!users[username]) return;
+    const newRole = users[username].role === 'admin' ? 'employee' : 'admin';
+    users[username].role = newRole;
+    USERS[username] = Object.assign({}, users[username]);
+    try { await db.ref('users/' + username).set(users[username]); } catch (e) {
+        showToast('❌ فشل تحديث الصلاحية'); return;
+    }
+    renderUsersList();
+    showToast('✅ تم تحويل ' + username + ' إلى ' + (newRole === 'admin' ? 'أدمن' : 'موظف'));
+}
+
+async function removeUser(username) {
+    if (!confirm('هل أنت متأكد من حذف المستخدم «' + username + '»؟\nسيتم إنهاء جميع جلساته ومنعه من الدخول.')) return;
+    if (username === currentUser.username) {
+        showToast('❌ لا يمكنك حذف حسابك الحالي'); return;
+    }
+    delete USERS[username];
+    delete usersCache[username];
+    try {
+        await db.ref('users/' + username).remove();
+        await db.ref('sessions/' + username).remove();
+    } catch (e) { showToast('❌ فشل الحذف'); return; }
+    renderUsersList();
+    showToast('🗑️ تم حذف المستخدم ' + username);
+}
+
+// مزامنة المستخدمين المضافين من Firebase عند الدخول
+function syncAdminUsers() {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    db.ref('users').once('value').then(function(snap) {
+        const fb = snap.val() || {};
+        usersCache = {};
+        Object.keys(fb).forEach(function(u) {
+            if (!APP_CONFIG.users[u] && fb[u] && fb[u].passwordHash) {
+                usersCache[u] = fb[u];
+            }
+        });
+    }).catch(function() {});
+}
+
+function saveSettings() {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    employees.forEach(function(e, i) {
+        const input = document.getElementById('emp' + i);
+        if (input) e.name = input.value;
+    });
+    db.ref('employees').set(employees);
+    renderCalendar();
+    renderLandscapeCalendar();
+    renderLegend();
+    renderMobileDayView();
+    showToast('تم الحفظ');
+}
+
+// ===== الإشعارات =====
+function checkShiftNotifications() {
+    if (!currentUser || currentUser.role === 'admin') return;
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayEmployee = getEmployeeForDate(today);
+    if (todayEmployee && todayEmployee.id === currentUser.id) {
+        const key = `${today.getFullYear()}-${today.getMonth()+1}-${today.getDate()}`;
+        if (!localStorage.getItem('notified_' + key)) {
+            const isFriday = today.getDay() === 5;
+            const message = isFriday ? 
+                `🌟 ورديتك اليوم (${today.getDate()} ${arabicMonths[today.getMonth()]}) - جمعة مباركة! 🕌` :
+                `📋 ورديتك اليوم (${today.getDate()} ${arabicMonths[today.getMonth()]})`;
+            showToast(message);
+            showPushNotification('⏰ تذكير بالوردية', message, 'shift-notification-' + key);
+            localStorage.setItem('notified_' + key, 'true');
+        }
+    }
+    
+    const tomorrowEmployee = getEmployeeForDate(tomorrow);
+    if (tomorrowEmployee && tomorrowEmployee.id === currentUser.id && now.getHours() >= 20) {
+        const key = `tomorrow_${tomorrow.getFullYear()}-${tomorrow.getMonth()+1}-${tomorrow.getDate()}`;
+        if (!localStorage.getItem('notified_' + key)) {
+            const message = `⏰ ورديتك غداً (${tomorrow.getDate()} ${arabicMonths[tomorrow.getMonth()]})`;
+            showToast(message);
+            showPushNotification('⏰ تذكير بالوردية', message, 'shift-notification-' + key);
+            localStorage.setItem('notified_' + key, 'true');
+        }
+    }
+}
+
+// ===== التوست =====
+function showToast(message, type) {
+    type = type || 'success';
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.innerHTML = `<div class="${type === 'success' ? 'bg-gray-800' : 'bg-red-600'} text-white px-6 py-3 rounded-xl shadow-2xl">${message}</div>`;
+    container.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3500);
+}
+
+// ===== بدء التطبيق =====
+window.addEventListener('load', async function() {
+    if (!await checkAutoLogin()) {
+        document.getElementById('loginScreen').classList.remove('hidden');
+    }
+    // طلب إذن الإشعارات بعد أول تفاعل مع الصفحة (أكثر موثوقية على الجوال)
+    requestNotificationPermissionOnce();
+});
+
+// طلب إذن الإشعارات بعد أول تفاعل مع الصفحة (متصفحات الجوال ترفض الطلب الفوري دون تفاعل المستخدم)
+let __notifAskedOnce__ = false;
+function requestNotificationPermissionOnce() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    function ask() {
+        if (__notifAskedOnce__ || Notification.permission !== 'default') return;
+        __notifAskedOnce__ = true;
+        Notification.requestPermission().then(function(perm) {
+            if (perm !== 'granted' && Notification.permission === 'default') {
+                // فشل الطلب الأول: عرض شريط ودود مع زر لتفعيل الإشعارات
+                showNotificationRequestBanner();
+            }
+        });
+    }
+    // أول نقرة/لمسة على الصفحة بعد الدخول
+    window.addEventListener('pointerdown', ask, { once: true });
+    window.addEventListener('keydown', ask, { once: true });
+    // احتياط: بعد 8 ثوانٍ من الدخول إن لم يتفاعل المستخدم
+    setTimeout(ask, 8000);
+}
+
+// شريط ودود يطلب تفعيل الإشعارات عند فشل طلب الإذن الأول
+function showNotificationRequestBanner() {
+    const existing = document.getElementById('notifBanner');
+    if (existing) return;
+    const div = document.createElement('div');
+    div.id = 'notifBanner';
+    div.className = 'fixed bottom-4 left-4 right-4 z-50';
+    div.innerHTML = '<div class="bg-gray-900/95 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center justify-between gap-3">' +
+        '<div class="text-sm">🔔 فعّل إشعارات التطبيق لتصلك رسائل الدردشة وتذكير الوردية</div>' +
+        '<button onclick="Notification.requestPermission().then(function(){document.getElementById(\'notifBanner\').remove();})" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap">تفعيل</button>' +
+        '<button onclick="document.getElementById(\'notifBanner\').remove()" class="text-gray-400 text-xs">تجاهل</button>' +
+        '</div>';
+    document.body.appendChild(div);
+    setTimeout(function() { if (div.parentNode) div.remove(); }, 25000);
+}
+
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').then(function(r) { console.log('SW:', r.scope); }).catch(function(e) { console.log('SW failed:', e); });
+    });
+}
+</script>
+
+</body>
+</html>
