@@ -863,9 +863,13 @@ function showPage(page) {
             adminPanel.classList.remove('hidden');
             renderSettings();
             if (usersAdminSection) {
-                usersAdminSection.classList.remove('hidden');
-                syncAdminUsers();
-                renderUsersList();
+                if (isSuperAdmin()) {
+                    usersAdminSection.classList.remove('hidden');
+                    syncAdminUsers();
+                    renderUsersList();
+                } else {
+                    usersAdminSection.classList.add('hidden');
+                }
             }
         } else {
             adminPanel.classList.add('hidden');
@@ -1391,8 +1395,8 @@ async function addNewUser() {
     const pass = document.getElementById('newUserPassword').value;
     const role = document.getElementById('newUserRole').value;
     errorEl.classList.add('hidden');
-    if (!currentUser || currentUser.role !== 'admin') {
-        errorEl.textContent = '❌ هذه الخاصية للمشرفين فقط'; errorEl.classList.remove('hidden'); return;
+    if (!isSuperAdmin()) {
+        errorEl.textContent = '❌ هذه الخاصية حصرية للمالك «شرف»'; errorEl.classList.remove('hidden'); return;
     }
     if (!name || name.length < 2) {
         errorEl.textContent = '❌ أدخل اسماً صحيحاً (حرفان على الأقل)'; errorEl.classList.remove('hidden'); return;
@@ -1422,6 +1426,7 @@ async function addNewUser() {
 }
 
 async function toggleUserRole(username) {
+    if (!isSuperAdmin()) { showToast('❌ هذه الخاصية حصرية للمالك «شرف»'); return; }
     const users = getUsersList();
     if (!users[username]) return;
     const newRole = users[username].role === 'admin' ? 'employee' : 'admin';
@@ -1435,6 +1440,7 @@ async function toggleUserRole(username) {
 }
 
 async function removeUser(username) {
+    if (!isSuperAdmin()) { showToast('❌ هذه الخاصية حصرية للمالك «شرف»'); return; }
     if (!confirm('هل أنت متأكد من حذف المستخدم «' + username + '»؟\nسيتم إنهاء جميع جلساته ومنعه من الدخول.')) return;
     if (username === currentUser.username) {
         showToast('❌ لا يمكنك حذف حسابك الحالي'); return;
@@ -1449,9 +1455,14 @@ async function removeUser(username) {
     showToast('🗑️ تم حذف المستخدم ' + username);
 }
 
+// هل المستخدم الحالي هو المالك الوحيد صاحب صلاحية إدارة المستخدمين
+function isSuperAdmin() {
+    return !!(currentUser && currentUser.username === 'شرف');
+}
+
 // مزامنة المستخدمين المضافين من Firebase عند الدخول
 function syncAdminUsers() {
-    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!isSuperAdmin()) return;
     db.ref('users').once('value').then(function(snap) {
         const fb = snap.val() || {};
         usersCache = {};
