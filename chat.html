@@ -4,10 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>الدردشة - قناة اليمن اليوم</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1d4ed8">
+    <link rel="apple-touch-icon" href="image/app-icon.png">
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <script src="config.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(r) { console.log('SW:', r.scope); }).catch(function(e) { console.log('SW failed:', e); });
+            });
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 
@@ -318,8 +328,13 @@ messageInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preve
 db.ref('chat/general').on('child_added', snap => {
     if (loadedMessages.has(snap.key)) return;
     loadedMessages.add(snap.key);
-    appendMessage(snap.key, snap.val());
+    const msg = snap.val();
+    appendMessage(snap.key, msg);
     scrollToBottom();
+    // تنبيه داخل صفحة الدردشة: صوت عند وصول رسالة من شخص آخر
+    if (currentUser && msg.sender !== currentUser.username) {
+        try { new Audio('data:audio/wav;base64,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').play().catch(()=>{}); } catch(e) {}
+    }
 });
 db.ref('chat/general').on('child_changed', snap => {
     const el = document.getElementById('msg-'+snap.key);

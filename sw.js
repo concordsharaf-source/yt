@@ -1,77 +1,62 @@
-// اسم ذاكرة التخزين المؤقت (غيّر الرقم عند كل تحديث)
-const CACHE_NAME = 'my-site-cache-v2';
+// ===== Service Worker - خدمة الإشعارات الخلفية =====
+// يتيح للموقع إرسال إشعارات في لوحة إشعارات الهاتف حتى عند تشغيل الموقع في الخلفية.
+// (إشعارات الويب لا تعمل عند إغلاق الموقع تماماً دون خادم Push - انظر دليل التحديث)
 
-// القائمة الأساسية (الضرورية فقط للتثبيت)
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
-];
+const ICON = 'image/app-icon.png';
+const APP_URL = './';
 
-// حدث التثبيت
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('جاري تثبيت الملفات الأساسية');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting()) // تفعيل السيرفس ووركر فوراً
-  );
+self.addEventListener('install', function(event) {
+  self.skipWaiting();
 });
 
-// حدث الجلب: استراتيجية ذكية للملفات
-self.addEventListener('fetch', (event) => {
-  // نتجاهل طلبات POST أو الطلبات لمواقع خارجية
-  if (event.request.method !== 'GET') return;
-  
-  event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        // إذا الملف موجود في الكاش، قدمه فوراً
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // إذا مش موجود، حاول تحميله من النت
-        return fetch(event.request)
-          .then((response) => {
-            // لو الطلب ناجح، خزنه للمرات الجاية
-            if (response && response.status === 200) {
-              const responseToCache = response.clone();
-              caches.open(CACHE_NAME)
-                .then((cache) => {
-                  cache.put(event.request, responseToCache);
-                });
-            }
-            return response;
-          })
-          .catch(() => {
-            // لو النت مقطوع والملف مش موجود
-            // للملفات HTML فقط، أرجع الصفحة الرئيسية المخزنة
-            if (event.request.headers.get('accept').includes('text/html')) {
-              return caches.match('/');
-            }
-            // للصور والملفات التانية، لا ترجع شيء
-            return new Response('');
-          });
-      })
-  );
+self.addEventListener('activate', function(event) {
+  event.waitUntil(self.clients.claim());
 });
 
-// حدث التفعيل: تنظيف الكاش القديم
-self.addEventListener('activate', (event) => {
+// استقبال رسائل إشعار من صفحات التطبيق (حتى الصفحات المغلقة داخل المتصفح)
+self.addEventListener('message', function(event) {
+  const data = event.data || {};
+  if (data.type === 'notify' && data.title) {
+    showNotification(data.title, data.body, data.tag, data.icon);
+  }
+});
+
+// استقبال دفعات الخلفية (تتطلب اشتراك Push - خطوة مستقبلية، موجودة جاهزة)
+self.addEventListener('push', function(event) {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch(e) {}
+  if (data.title) {
+    event.waitUntil(
+      showNotification(data.title, data.body, data.tag, data.icon)
+    );
+  }
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('جاري حذف الكاش القديم:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
+    self.clients.matchAll({ type: 'window' }).then(function(clients) {
+      // فتح/تركيز نافذة التطبيق عند الضغط على الإشعار
+      if (clients.length > 0) {
+        clients[0].focus();
+        return;
+      }
+      return self.clients.openWindow(APP_URL);
     })
   );
-  return self.clients.claim(); // سيطرة فورية على كل الصفحات
 });
+
+function showNotification(title, body, tag, icon) {
+  const opts = {
+    body: body || '',
+    icon: icon || ICON,
+    badge: ICON,
+    tag: tag || 'ytcal-notification',
+    silent: false,
+    requireInteraction: false,
+    vibrate: [200, 100, 200]
+  };
+  // إعادة الظهور حتى لو كان الإشعار السابق بنفس tag
+  if (tag) opts.renotify = true;
+  return self.registration.showNotification(title, opts);
+}
