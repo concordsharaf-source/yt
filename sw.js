@@ -2,7 +2,7 @@
 // يتيح للموقع إرسال إشعارات في لوحة إشعارات الهاتف حتى عند تشغيل الموقع في الخلفية.
 // (إشعارات الويب لا تعمل عند إغلاق الموقع تماماً دون خادم Push - انظر دليل التحديث)
 
-const ICON = 'image/app-icon.png';
+const ICON = 'images/icon-192x192.png';
 const APP_URL = './';
 
 self.addEventListener('install', function(event) {
