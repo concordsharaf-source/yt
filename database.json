@@ -1,0 +1,33 @@
+{
+  "rules": {
+    ".read": true,
+    "shifts": {
+      ".write": "root.child('users').child('اشرف').child('role').val() === 'admin' || root.child('users').child('شرف').child('role').val() === 'admin'",
+      "$date": {
+        ".validate": "newData.child('presenter').isString() || newData.val() === null"
+      }
+    },
+    "employees": {
+      ".write": "root.child('users').child('اشرف').child('role').val() === 'admin' || root.child('users').child('شرف').child('role').val() === 'admin'"
+    },
+    "users": {
+      "$username": {
+        ".read": "auth != null || root.child('users').child('اشرف').child('role').val() === 'admin'",
+        ".write": "root.child('users').child('اشرف').child('role').val() === 'admin' || root.child('users').child('شرف').child('role').val() === 'admin' || $username === newData.child('id').val()",
+        ".validate": "newData.hasChild('passwordHash')"
+      }
+    },
+    "sessions": {
+      ".read": false,
+      ".write": true
+    },
+    "chat": {
+      "general": {
+        "$messageId": {
+          ".write": "newData.child('sender').exists() && newData.child('timestamp').exists() || data.exists()",
+          ".validate": "newData.hasChild('sender') && newData.hasChild('timestamp')"
+        }
+      }
+    }
+  }
+}
