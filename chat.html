@@ -237,14 +237,15 @@ firebase.initializeApp(APP_CONFIG.firebaseConfig);
 const db = firebase.database();
 
 // ===== المستخدمون: الثابتون في config.js + المستخدمون المضافون من الأدمن في Firebase =====
-const USERS = Object.assign({}, APP_CONFIG.users);
+let USERS = Object.assign({}, APP_CONFIG.users);
 (async function loadFirebaseUsers() {
     try {
         const snap = await db.ref('users').once('value');
         const fb = snap.val() || {};
+        // دمج كامل: تحديث الهش من Firebase لجميع المستخدمين (حتى لو تغيّر في أي مكان)
         Object.keys(fb).forEach(function(u) {
-            if (!APP_CONFIG.users[u] && fb[u] && fb[u].passwordHash) {
-                USERS[u] = fb[u];
+            if (fb[u] && fb[u].passwordHash) {
+                USERS[u] = { ...(APP_CONFIG.users[u] || fb[u]), ...fb[u] };
             }
         });
     } catch (e) {}
@@ -262,32 +263,47 @@ function getDeviceId() {
     return id;
 }
 
-// ===== التحقق من الجلسة =====
-// 1) أولاً: hash كلمة المرور المحفوظة مع المستخدمين
-// 2) إن لم يتوفر hash: رمز الجلسة في Firebase (sessions) — يتيح فتح الدردشة دون إعادة إدخال كلمة المرور
+// ===== التحقق من الجلسة (متسامح مثل index.html — لا يفشل الجلسة بسبب شبكة بطيئة) =====
 let currentUser = null;
 (async function verifySession() {
     const saved = localStorage.getItem('currentUser');
     if (saved) {
         try {
             const parsed = JSON.parse(saved);
-            const u = USERS[parsed.username];
+            if (!parsed.username) throw new Error('no username');
+            // جلب أحدث بيانات المستخدم من Firebase (حتى لو تغيّرت كلمة المرور في index)
+            let fbUser = null;
+            try {
+                const snap = await db.ref('users/' + parsed.username).once('value');
+                fbUser = snap.val();
+            } catch(e) {}
+            const configUser = APP_CONFIG.users[parsed.username] || null;
+            // الهش المفضّل = الأحدث بين Firebase وconfig.js
+            const preferredHash = (fbUser && fbUser.passwordHash) || (configUser && configUser.passwordHash) || null;
+            const u = USERS[parsed.username] || configUser || (fbUser ? fbUser : null);
             if (u) {
-                if (u.passwordHash && parsed.passwordHash === u.passwordHash) {
-                    currentUser = { username: parsed.username, ...u };
+                const hashOk = preferredHash && parsed.passwordHash === preferredHash;
+                if (hashOk) {
+                    currentUser = { username: parsed.username, ...(configUser || {}), ...(fbUser || {}) };
                 } else if (parsed.sessionToken) {
                     // تحقق من رمز الجلسة في Firebase
-                    const sess = await db.ref('sessions/' + parsed.username).once('value');
-                    if (sess.val() && sess.val().sessionToken === parsed.sessionToken) {
-                        currentUser = { username: parsed.username, ...u };
-                    }
+                    try {
+                        const sess = await db.ref('sessions/' + parsed.username).once('value');
+                        if (sess.val() && sess.val().sessionToken === parsed.sessionToken) {
+                            currentUser = { username: parsed.username, ...(configUser || {}), ...(fbUser || {}) };
+                        }
+                    } catch(e) {}
                 }
             }
         } catch(e) {}
     }
     if (!currentUser) {
-        alert('انتهت الجلسة. الرجاء تسجيل الدخول من الصفحة الرئيسية.');
-        window.location.href = 'index.html';
+        // فاصل قصير ثم إعادة المحاولة مرة أخيرة (شبكة بطيئة)
+        await new Promise(r => setTimeout(r, 1500));
+        if (!currentUser) {
+            alert('انتهت الجلسة. الرجاء تسجيل الدخول من الصفحة الرئيسية.');
+            window.location.href = 'index.html';
+        }
     }
 })();
 
@@ -305,6 +321,38 @@ function createAvatarElement(username, small) {
     div.title = username;
     return div;
 }
+
+// ===== الكاش المحلي (نمط واتساب): عرض الرسائل القديمة محليًا فورًا =====
+// تحميل الرسائل المحفوظة في الجهاز و/أو أحدث الرسائل من الشبكة وعرضها فورًا
+db.ref('chat/general').orderByChild('timestamp').limitToLast(300).once('value', snap => {
+    const val = snap.val() || {};
+    const msgs = Object.entries(val).map(([k, v]) => ({ key: k, ...v }));
+    // فرز حسب الطابع الزمني ثم إضافتها دفعة واحدة (دون تمرير تلقائي مزعج)
+    msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    msgs.forEach(m => {
+        loadedMessages.add(m.key);
+        appendMessage(m.key, m);
+    });
+    if (msgs.length) messagesArea.scrollTop = messagesArea.scrollHeight;
+    // حفظ نسخة محلية محدثة (آخر 300 رسالة) — لا نحفظ الصور base64 الثقيلة
+    try {
+        const toSave = msgs.filter(m => !m.image).map(m => ({ key: m.key, sender: m.sender, senderId: m.senderId, deviceId: m.deviceId, time: m.time, timestamp: m.timestamp, text: m.text, edited: m.edited, reactions: m.reactions, replyTo: m.replyTo }));
+        localStorage.setItem('chatCache', JSON.stringify(toSave.slice(-300)));
+    } catch(e) {}
+});
+
+// تحميل الكاش المحلي فورًا حتى قبل رد الشبكة (شبكة بطيئة/إشكالية)
+try {
+    const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
+    if (cached.length) {
+        cached.forEach(m => {
+            loadedMessages.add(m.key);
+            appendMessage(m.key, m);
+        });
+        // عند أول تحميل محلي نتأكد أن الترتيب صحيح ونمرر للأسفل
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+} catch(e) {}
 
 document.getElementById('headerTitle').textContent = '💬 ' + currentUser.username;
 if (currentUser.role === 'admin') document.getElementById('headerSubtitle').textContent = '👑 مشرف';
@@ -341,6 +389,13 @@ db.ref('chat/general').on('child_added', snap => {
     loadedMessages.add(snap.key);
     const msg = snap.val();
     appendMessage(snap.key, msg);
+    // تحديث الكاش المحلي
+    try {
+        const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
+        const m = { key: snap.key, sender: msg.sender, senderId: msg.senderId, deviceId: msg.deviceId, time: msg.time, timestamp: msg.timestamp, text: msg.text, edited: msg.edited, reactions: msg.reactions, replyTo: msg.replyTo };
+        cached.push(m);
+        localStorage.setItem('chatCache', JSON.stringify(cached.slice(-300)));
+    } catch(e) {}
     scrollToBottom();
     // تنبيه داخل صفحة الدردشة: صوت عند وصول رسالة من شخص آخر
     if (currentUser && msg.sender !== currentUser.username) {
@@ -351,11 +406,23 @@ db.ref('chat/general').on('child_changed', snap => {
     const el = document.getElementById('msg-'+snap.key);
     if (el) { el.remove(); loadedMessages.delete(snap.key); }
     appendMessage(snap.key, snap.val());
+    // تحديث الرسالة في الكاش المحلي
+    try {
+        const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
+        const i = cached.findIndex(m => m.key === snap.key);
+        if (i >= 0) { cached[i] = { ...cached[i], text: snap.val().text, edited: snap.val().edited, reactions: snap.val().reactions, replyTo: snap.val().replyTo }; localStorage.setItem('chatCache', JSON.stringify(cached)); }
+    } catch(e) {}
 });
 db.ref('chat/general').on('child_removed', snap => {
     const el = document.getElementById('msg-'+snap.key);
     if (el) { el.style.transition='all 0.3s'; el.style.opacity='0'; el.style.transform='scale(0.8)'; setTimeout(()=>el.remove(),300); }
     loadedMessages.delete(snap.key);
+    // حذف الرسالة من الكاش المحلي
+    try {
+        const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
+        const i = cached.findIndex(m => m.key === snap.key);
+        if (i >= 0) { cached.splice(i, 1); localStorage.setItem('chatCache', JSON.stringify(cached)); }
+    } catch(e) {}
 });
 
 // رفع الصور إلى Firebase Storage بدل تخزينها كـ Base64 في قاعدة البيانات
