@@ -324,6 +324,12 @@ function createAvatarElement(username, small) {
 
 // ===== الكاش المحلي (نمط واتساب): عرض الرسائل القديمة محليًا فورًا =====
 // تحميل الرسائل المحفوظة في الجهاز و/أو أحدث الرسائل من الشبكة وعرضها فورًا
+const CACHE_VERSION = 2; // يُرفع مع كل تحديث رئيسي لصفحة الدردشة
+const SAVED_VERSION = parseInt(localStorage.getItem('chatCacheVersion') || '0');
+if (SAVED_VERSION < CACHE_VERSION) {
+    localStorage.removeItem('chatCache');
+    localStorage.setItem('chatCacheVersion', String(CACHE_VERSION));
+}
 db.ref('chat/general').orderByChild('timestamp').limitToLast(300).once('value', snap => {
     const val = snap.val() || {};
     const msgs = Object.entries(val).map(([k, v]) => ({ key: k, ...v }));
@@ -334,6 +340,9 @@ db.ref('chat/general').orderByChild('timestamp').limitToLast(300).once('value', 
         appendMessage(m.key, m);
     });
     if (msgs.length) messagesArea.scrollTop = messagesArea.scrollHeight;
+    // مسح placeholder بعد وصول أول رسالة
+    const ph = messagesArea.querySelector('div[style]');
+    if (ph) ph.remove();
     // حفظ نسخة محلية محدثة (آخر 300 رسالة) — لا نحفظ الصور base64 الثقيلة
     try {
         const toSave = msgs.filter(m => !m.image).map(m => ({ key: m.key, sender: m.sender, senderId: m.senderId, deviceId: m.deviceId, time: m.time, timestamp: m.timestamp, text: m.text, edited: m.edited, reactions: m.reactions, replyTo: m.replyTo }));
@@ -342,6 +351,7 @@ db.ref('chat/general').orderByChild('timestamp').limitToLast(300).once('value', 
 });
 
 // تحميل الكاش المحلي فورًا حتى قبل رد الشبكة (شبكة بطيئة/إشكالية)
+// يُنفَّذ مبكرًا ومرة أخرى عند اكتمال رد الشبكة لضمان العرض الأسرع
 try {
     const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
     if (cached.length) {
@@ -349,7 +359,6 @@ try {
             loadedMessages.add(m.key);
             appendMessage(m.key, m);
         });
-        // عند أول تحميل محلي نتأكد أن الترتيب صحيح ونمرر للأسفل
         messagesArea.scrollTop = messagesArea.scrollHeight;
     }
 } catch(e) {}
