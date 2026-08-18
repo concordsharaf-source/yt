@@ -583,35 +583,76 @@ function updateChatBadge() {
     }
 }
 
+// عدّ الرسائل المتراكمة التي أرسلها الآخرون بعد آخر قراءة (قبل فتح التطبيق الآن)
+function countUnseenBacklog(username) {
+    try {
+        db.ref('chat/general')
+            .orderByChild('timestamp')
+            .startAt(lastKnownChatTimestamp + 1)
+            .once('value', function(snap) {
+                const val = snap.val();
+                if (!val) return;
+                const myId = getDeviceId();
+                Object.values(val).forEach(function(msg) {
+                    if (!msg || msg.sender === currentUser.username) return;
+                    if (msg.deviceId === myId) return;
+                    unreadChatCount++;
+                });
+                persistUnreadCount(username);
+                updateChatBadge();
+            });
+    } catch (e) {}
+}
+
 // ===== شارة الدردشة مع إشعارات فعلية =====
 // نستخدم "علامة مائية" (watermark): لا نعدّ رسالة جديدة إلا إذا كانت أُضيفت
-// بعد آخر رسالة كانت موجودة وقت تسجيل الدخول (أو وقت آخر فتح للدردشة)
+// بعد آخر مرة شاهدها المستخدم (وقت إغلاق الدردشة أو آخر فتح لها)
 let lastKnownChatTimestamp = 0;
+
+// استرجاع العداد المحفوظ حتى لو وصل المستخدم والتطبيق مغلق (رسائل تراكمت أثناء الغياب)
+function loadSavedUnreadCount(username) {
+    try {
+        const saved = parseInt(localStorage.getItem('unreadChatCount_' + username), 10);
+        unreadChatCount = isNaN(saved) ? 0 : saved;
+    } catch (e) { unreadChatCount = 0; }
+    updateChatBadge();
+}
+
+function persistUnreadCount(username) {
+    try {
+        localStorage.setItem('unreadChatCount_' + username, String(unreadChatCount));
+    } catch ( e) {}
+}
 
 function startListeningForChatNotifications() {
     const username = currentUser ? currentUser.username : '';
 
-    // 1) تحميل آخر رسالة موجودة حالياً في الدردشة (الرسائل القديمة) أولاً
-    // ثم ربط مستمع الرسائل الجديدة فقط بعد استلام المرجع حتى لا تُعد الرسائل القديمة كجديدة
-    db.ref('chat/general').orderByChild('timestamp').limitToLast(1)
-        .once('value', function(snap) {
-            const val = snap.val();
-            if (val) {
-                const key = Object.keys(val)[0];
-                const ts = val[key].timestamp || Date.now();
-                // المرجع = آخر رسالة موجودة فعلاً (حتى لا تُعد القديمة كجديدة)
-                // ملاحظة: لا نستخدم max() مع القيمة المحفوظة هنا، لأن القيمة المحفوظة
-                // قد تكون زمن فتح الدردشة الأخير (Date.now()) في جهاز بقي مفتوحاً،
-                // وأي رسالة وصلت بين ذلك الحين والآن يجب أن تُعدّ جديدة
-                lastKnownChatTimestamp = ts;
-            } else if (lastKnownChatTimestamp === 0) {
-                // الدردشة فارغة تماماً: لا توجد رسائل قديمة ولا حاجة لعلامة
-                lastKnownChatTimestamp = Date.now();
-            }
-            // حفظ المرجع وبدء الاستماع فقط بعد ضمان حصولنا على العلامة المائية
-            localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
-            attachChatChildAddedListener(username);
-        });
+    // أول مرة فقط: نأخذ آخر رسالة موجودة مرجعًا ابتدائيًا (حتى لا تُعد الرسائل القديمة كجديدة)
+    const savedTs = parseInt(localStorage.getItem('lastChatTimestamp_' + username), 10) || 0;
+    if (savedTs === 0) {
+        db.ref('chat/general').orderByChild('timestamp').limitToLast(1)
+            .once('value', function(snap) {
+                const val = snap.val();
+                if (val) {
+                    const key = Object.keys(val)[0];
+                    lastKnownChatTimestamp = val[key].timestamp || Date.now();
+                } else {
+                    lastKnownChatTimestamp = Date.now();
+                }
+                localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+                attachChatChildAddedListener(username);
+            });
+    } else {
+        // المستخدم قرأ الرسائل سابقًا — المرجع = آخر مرة شاهدها،
+        // وأي رسالة وصلته خلال غيابه (حتى قبل فتح التطبيق الآن) تُعدّ جديدة
+        lastKnownChatTimestamp = savedTs;
+        attachChatChildAddedListener(username);
+    }
+    // استرجاع العداد المحفوظ وعرضه فورًا
+    loadSavedUnreadCount(username);
+
+    // عدّ الرسائل التي وصلته أثناء غيابه (المتراكمة قبل فتح التطبيق الآن)
+    countUnseenBacklog(username);
 }
 
 function attachChatChildAddedListener(username) {
@@ -629,16 +670,15 @@ function attachChatChildAddedListener(username) {
         const isSameDevice = msg.deviceId === getDeviceId();
 
         if (isOldMessage || isOwnMessage || isSameDevice || localStorage.getItem('chatWindowOpen')) {
-            // نحدّث المرجع حتى لا تُعدّ رسالة قديمة لاحقاً عند فتح الموقع من جديد
-            lastKnownChatTimestamp = Math.max(lastKnownChatTimestamp, ts);
-            localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
+            // رسائل قديمة أو من جهازنا أو الدردشة مفتوحة الآن — لا نعدّها
             return;
         }
 
-        // رسالة جديدة فعلاً من شخص آخر
-        lastKnownChatTimestamp = ts;
+        // رسالة جديدة فعلاً من شخص آخر (حتى لو وصلت أثناء إغلاق التطبيق)
+        lastKnownChatTimestamp = Math.max(lastKnownChatTimestamp, ts);
         localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
         unreadChatCount++;
+        persistUnreadCount(username);
         updateChatBadge();
 
         // إشعار فعلي في لوحة إشعارات الهاتف + المتصفح
@@ -726,9 +766,10 @@ function getDeviceId() {
 // ===== فتح الدردشة =====
 function openChatPage() {
     if (!currentUser) return;
-    // صفحة الدردشة تتحقق من رمز الجلسة المخزن في Firebase (db.ref('sessions'))
+    // صفحة الدردشة تتحقق من رمز الجلسة المخزنة في Firebase (db.ref('sessions'))
     unreadChatCount = 0;
     lastKnownChatTimestamp = Date.now();
+    persistUnreadCount(currentUser.username);
     updateChatBadge();
     localStorage.setItem('chatWindowOpen', 'true');
     // تظليل زر الدردشة أثناء فتحها
