@@ -6,7 +6,7 @@
 <title>جدول الورديات</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="tw.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#1d4ed8">
 <link rel="apple-touch-icon" href="images/icon-192x192.png">
@@ -446,10 +446,35 @@ async function checkAutoLogin() {
     if (saved) {
         try {
             const user = JSON.parse(saved);
-            if (user.username && USERS[user.username] && user.passwordHash) {
-                if (USERS[user.username].passwordHash === user.passwordHash) {
-                    // كلمة المرور ما زالت صالحة → إعادة الدخول مباشرة
+            if (user.username && USERS[user.username] && user.passwordHash && user.sessionToken) {
+                // الجلسة دائمة: الجلسة السابقة ناتجة عن تسجيل دخول صحيح فعلياً (رمز الجلسة رمز عشوائي
+                // لا يمكن تخمينه ولا يوجد إلا في جهاز المستخدم) — لا نُخرج المستخدم عند تحديث الصفحة
+                const fbHash = USERS[user.username].passwordHash;
+                const configHash = APP_CONFIG.users[user.username] ? APP_CONFIG.users[user.username].passwordHash : null;
+                // القاعدة 1: الهاش المحفوظ يطابق الهاش الحالي (سواء في Firebase أو config.js)
+                if (fbHash === user.passwordHash || (configHash && configHash === user.passwordHash)) {
                     await performLogin({ username: user.username, password: null, fromSession: true });
+                    return true;
+                }
+                // القاعدة 2: لا يوجد تغيير معلّق لكلمة المرور (Firebase و config متطابقان)
+                // → نتحقق من رمز الجلسة في Firebase قبل أن نثق به (يمنع أي جلسة مزوّرة)
+                if (fbHash && fbHash === configHash) {
+                    try {
+                        const snap = await db.ref('sessions/' + user.username).get();
+                        const sessions = snap.val() || {};
+                        const valid = sessions.sessionToken === user.sessionToken;
+                        if (valid) {
+                            await performLogin({ username: user.username, password: null, fromSession: true });
+                            localStorage.setItem('currentUser', JSON.stringify(Object.assign({}, user, { passwordHash: fbHash })));
+                            return true;
+                        }
+                    } catch(e) { /* فشل التحقق → رفض الجلسة */ }
+                }
+                // القاعدة 3: نافذة انتقالية — تغيير كلمة المرور ما زال يسير (fbHash ≠ configHash)
+                // والهاش المحفوظ يطابق الهاش السابق المعروف → نبقي المستخدم داخل حسابه
+                if (fbHash && fbHash !== configHash && configHash === user.passwordHash) {
+                    await performLogin({ username: user.username, password: null, fromSession: true });
+                    localStorage.setItem('currentUser', JSON.stringify(Object.assign({}, user, { passwordHash: fbHash })));
                     return true;
                 }
             }
@@ -1673,4 +1698,4 @@ if ('serviceWorker' in navigator) {
 </script>
 
 </body>
-    </html>
+</html>
