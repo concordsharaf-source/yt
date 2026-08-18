@@ -363,6 +363,14 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
             </div>
         </div>
 
+        <div class="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <p class="text-xs text-red-700 mb-2">🛡️ هل تخشى أن شخصاً آخر يتجسس على حسابك من جهاز آخر؟ اضغط الزر لإلغاء جميع الجلسات المفتوحة على باقي الأجهزة (يجب إعادة تسجيل الدخول منها).</p>
+            <button onclick="terminateAllOtherSessions()" 
+                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                🚪 إنهاء جميع الجلسات الأخرى
+            </button>
+            <div id="terminateResult" class="text-sm hidden text-center mt-2"></div>
+        </div>
         <button onclick="logout()" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl text-lg transition-all flex items-center justify-center gap-2 mt-6">
             🚪 تسجيل الخروج
         </button>
@@ -529,6 +537,40 @@ function logout() {
     document.getElementById('settingsAdminPanel').classList.add('hidden');
     const usersAdminSection = document.getElementById('usersAdminSection');
     if (usersAdminSection) usersAdminSection.classList.add('hidden');
+}
+
+// ===== إنهاء جميع الجلسات الأخرى =====
+// يُلغي كل الجلسات المفتوحة باسم المستخدم على باقي الأجهزة
+// آلية العمل: توليد رمز جلسة جديد وحفظه في Firebase، بحيث تُرفض رموز الأجهزة الأخرى القديمة
+// عند أي عملية حساسة (مثل الدردشة)، ويبقى الجهاز الحالي متصل لأنه يُحدَّث رمزه محلياً
+function terminateAllOtherSessions() {
+    if (!currentUser) return;
+    const username = currentUser.username;
+    const newToken = generateSessionToken();
+    db.ref('sessions/' + username).set({ sessionToken: newToken, lastLogin: Date.now() })
+        .then(function() {
+            const session = JSON.parse(localStorage.getItem('currentUser') || '{}');
+            session.sessionToken = newToken;
+            localStorage.setItem('currentUser', JSON.stringify(session));
+            const resultEl = document.getElementById('terminateResult');
+            resultEl.textContent = '✅ تم إنهاء جميع الجلسات الأخرى. الأجهزة الأخرى يجب أن تعيد تسجيل الدخول.';
+            resultEl.className = 'text-sm text-green-700 text-center mt-2';
+            // تسجيل العملية في السجل الأمني
+            try {
+                db.ref('auditLog').push({
+                    action: 'terminate_sessions',
+                    by: username,
+                    time: Date.now(),
+                    detail: 'أنهى جميع الجلسات الأخرى على الأجهزة الأخرى'
+                });
+            } catch(e) {}
+            showToast('🛡️ تم إنهاء جميع الجلسات الأخرى');
+        })
+        .catch(function(err) {
+            const resultEl = document.getElementById('terminateResult');
+            resultEl.textContent = '❌ فشل الإلغاء — تأكد من اتصالك بالإنترنت وحاول مرة أخرى';
+            resultEl.className = 'text-sm text-red-600 text-center mt-2';
+        });
 }
 
 // ===== مؤشر الاتصال =====
@@ -759,17 +801,6 @@ function initApp() {
         renderMobileDayView();
     });
     
-    // مزامنة كلمات المرور بين الأجهزة من Firebase (المخزنة الآن كـ Hash)
-    db.ref('users').on('value', function(snapshot) {
-        const fbUsers = snapshot.val();
-        if (fbUsers) {
-            Object.keys(fbUsers).forEach(function(username) {
-                if (USERS[username] && fbUsers[username].passwordHash) {
-                    USERS[username].passwordHash = fbUsers[username].passwordHash;
-                }
-            });
-        }
-    });
 
     db.ref('employees').on('value', function(snapshot) {
         const data = snapshot.val();
@@ -1328,6 +1359,8 @@ async function changePassword() {
     // Update password hash in USERS object
     const newHash = await hashPassword(newPass);
     USERS[username].passwordHash = newHash;
+    // حدّث أيضاً قائمة المستخدمين في صفحة الإعدادات فوراً
+    if (isSuperAdmin() && usersCache[username]) { usersCache[username].passwordHash = newHash; }
 
     // Update localStorage (hash فقط، لا كلمة مرور نصية)
     const session = JSON.parse(localStorage.getItem('currentUser') || '{}');
@@ -1335,7 +1368,11 @@ async function changePassword() {
     localStorage.setItem('currentUser', JSON.stringify(session));
 
     // Save to Firebase for persistence across devices
-    db.ref('users/' + username).set({ passwordHash: newHash, role: currentUser.role, id: currentUser.id });
+    // حفظ كلمة المرور الجديدة مع الاحتفاظ بأي حقول موجودة مسبقاً (مثل addedByAdmin)
+    const existing = db.ref('users/' + username).once('value').then(function(s) { return s.val() || {}; });
+    existing.then(function(data) {
+        db.ref('users/' + username).set(Object.assign({}, data, { passwordHash: newHash, role: currentUser.role, id: currentUser.id }));
+    });
 
     // Clear inputs
     document.getElementById('currentPassword').value = '';
@@ -1486,6 +1523,8 @@ function syncAdminUsers() {
                 usersCache[u] = fb[u];
             }
         });
+        // إعادة رسم القائمة فوراً — حتى تظهر تلقائياً دون الحاجة لإضافة أدمن جديد
+        renderUsersList();
     }).catch(function() {});
 }
 
@@ -1549,6 +1588,35 @@ function showToast(message, type) {
     setTimeout(function() { toast.remove(); }, 3500);
 }
 
+// ===== مزامنة كلمات المرور والصلاحات من Firebase =====
+// قاعدة Firebase هي المرجع النهائي: إذا غيّر المستخدم كلمة مروره من أي جهاز
+// فإن المستخدمين الحاليين على باقي الأجهزة يجب أن يستلموا التحديث فوراً
+db.ref('users').on('value', function(snap) {
+    const fb = snap.val() || {};
+    Object.keys(fb).forEach(function(u) {
+        if (fb[u] && fb[u].passwordHash) {
+            if (USERS[u]) {
+                // مستخدم موجود أصلاً (في config.js) — حدّث كلمة مروره ودوره من Firebase
+                USERS[u].passwordHash = fb[u].passwordHash;
+                if (fb[u].role) USERS[u].role = fb[u].role;
+            } else {
+                // مستخدم أضافه الأدمن من داخل التطبيق — أدخله في USERS وقائمة الإدارة
+                USERS[u] = Object.assign({}, fb[u]);
+            }
+        }
+    });
+    // إذا كانت جلسة الدخول الحالية مفتوحة، حدّث currentUser أيضاً (لكي لا يُفصل)
+    if (currentUser && USERS[currentUser.username]) {
+        currentUser.role = USERS[currentUser.username].role;
+        currentUser.passwordHash = USERS[currentUser.username].passwordHash;
+    }
+    // تحديث قائمة المستخدمين فوراً إن كانت صفحة الإعدادات مفتوحة
+    if (currentUser && currentUser.role === 'admin' && isSuperAdmin()) {
+        Object.keys(USERS).forEach(function(u) { if (!APP_CONFIG.users[u]) usersCache[u] = USERS[u]; });
+        renderUsersList();
+    }
+});
+
 // ===== بدء التطبيق =====
 window.addEventListener('load', async function() {
     if (!await checkAutoLogin()) {
@@ -1605,4 +1673,4 @@ if ('serviceWorker' in navigator) {
 </script>
 
 </body>
-</html>
+    </html>
