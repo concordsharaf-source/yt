@@ -1414,6 +1414,7 @@ async function addNewUser() {
     const newUser = { id: maxId + 1, role: role, passwordHash: hash, addedByAdmin: true };
     try {
         await db.ref('users/' + name).set(newUser);
+        await writeAuditLog('إضافة مستخدم', name, 'أصبح: ' + (role === 'admin' ? 'أدمن' : 'موظف'));
     } catch (e) {
         errorEl.textContent = '❌ فشل الحفظ، تأكد من اتصالك بالإنترنت'; errorEl.classList.remove('hidden'); return;
     }
@@ -1432,7 +1433,8 @@ async function toggleUserRole(username) {
     const newRole = users[username].role === 'admin' ? 'employee' : 'admin';
     users[username].role = newRole;
     USERS[username] = Object.assign({}, users[username]);
-    try { await db.ref('users/' + username).set(users[username]); } catch (e) {
+    try { await db.ref('users/' + username).set(users[username]);
+    await writeAuditLog('تحويل صلاحية', username, 'أصبح: ' + (newRole === 'admin' ? 'أدمن' : 'موظف')); } catch (e) {
         showToast('❌ فشل تحديث الصلاحية'); return;
     }
     renderUsersList();
@@ -1450,6 +1452,7 @@ async function removeUser(username) {
     try {
         await db.ref('users/' + username).remove();
         await db.ref('sessions/' + username).remove();
+        await writeAuditLog('حذف مستخدم', username, 'أُنهي جميع جلساته');
     } catch (e) { showToast('❌ فشل الحذف'); return; }
     renderUsersList();
     showToast('🗑️ تم حذف المستخدم ' + username);
@@ -1458,6 +1461,18 @@ async function removeUser(username) {
 // هل المستخدم الحالي هو المالك الوحيد صاحب صلاحية إدارة المستخدمين
 function isSuperAdmin() {
     return !!(currentUser && currentUser.username === 'شرف');
+}
+
+// تسجيل أمني لأي إضافة أو حذف أو تحويل في قسم إدارة المستخدمين
+function writeAuditLog(action, targetUser, details) {
+    const entry = {
+        by: currentUser ? currentUser.username : 'مجهول',
+        action: action,
+        targetUser: targetUser,
+        details: details,
+        at: new Date().toLocaleString('en-US', { hour12: false })
+    };
+    db.ref('auditLog').push(entry).catch(function() {});
 }
 
 // مزامنة المستخدمين المضافين من Firebase عند الدخول
