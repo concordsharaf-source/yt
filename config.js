@@ -24,8 +24,8 @@ const APP_CONFIG = {
     'شرف':  { passwordHash: 'e13ee44f7c7670f8d07ca553bbe8afadc2bc359663cb6d3fec858ffaf4dc9284', id: 5, role: 'admin' }
   },
 
-  imageInputPath: 'image/',   // مسار مجلد الصور
-  appIconPath: 'image/app-icon.png'
+  imageInputPath: 'images/',   // مسار مجلد الصور
+  appIconPath: 'images/icon-192x192.png'
 };
 
 // ===== دالة مساعدة لحساب Hash كلمة المرور (تُستخدم عند تغييرها) =====
