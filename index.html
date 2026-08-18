@@ -776,7 +776,7 @@ function openChatPage() {
     document.querySelectorAll('.nav-btn').forEach(function(btn) {
         btn.classList.toggle('bg-white/30', btn.dataset.page === 'chat');
     });
-    const chatWindow = window.open('chat.html', '_blank');
+    const chatWindow = window.open('chat.html?v=2', '_blank');
     const checkWindow = setInterval(function() {
         if (chatWindow.closed) {
             localStorage.removeItem('chatWindowOpen');
