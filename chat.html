@@ -7,9 +7,9 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1d4ed8">
     <link rel="apple-touch-icon" href="images/icon-192x192.png">
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="firebase-app.js"></script>
+    <script src="firebase-database.js"></script>
+    <script src="firebase-storage.js"></script>
     <script src="config.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
@@ -19,7 +19,7 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+        @import url('fonts.css');
 
         * {
             box-sizing: border-box;
@@ -323,51 +323,69 @@ function createAvatarElement(username, small) {
 }
 
 // ===== الكاش المحلي (نمط واتساب): عرض الرسائل القديمة محليًا فورًا =====
-// تحميل الرسائل المحفوظة في الجهاز و/أو أحدث الرسائل من الشبكة وعرضها فورًا
 const CACHE_VERSION = 2; // يُرفع مع كل تحديث رئيسي لصفحة الدردشة
 const SAVED_VERSION = parseInt(localStorage.getItem('chatCacheVersion') || '0');
 if (SAVED_VERSION < CACHE_VERSION) {
     localStorage.removeItem('chatCache');
     localStorage.setItem('chatCacheVersion', String(CACHE_VERSION));
 }
-db.ref('chat/general').orderByChild('timestamp').limitToLast(300).once('value', snap => {
-    const val = snap.val() || {};
-    const msgs = Object.entries(val).map(([k, v]) => ({ key: k, ...v }));
-    // فرز حسب الطابع الزمني ثم إضافتها دفعة واحدة (دون تمرير تلقائي مزعج)
-    msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    msgs.forEach(m => {
-        loadedMessages.add(m.key);
-        appendMessage(m.key, m);
-    });
-    if (msgs.length) messagesArea.scrollTop = messagesArea.scrollHeight;
-    // مسح placeholder بعد وصول أول رسالة
-    const ph = messagesArea.querySelector('div[style]');
-    if (ph) ph.remove();
-    // حفظ نسخة محلية محدثة (آخر 300 رسالة) — لا نحفظ الصور base64 الثقيلة
-    try {
-        const toSave = msgs.filter(m => !m.image).map(m => ({ key: m.key, sender: m.sender, senderId: m.senderId, deviceId: m.deviceId, time: m.time, timestamp: m.timestamp, text: m.text, edited: m.edited, reactions: m.reactions, replyTo: m.replyTo }));
-        localStorage.setItem('chatCache', JSON.stringify(toSave.slice(-300)));
-    } catch(e) {}
-});
 
-// تحميل الكاش المحلي فورًا حتى قبل رد الشبكة (شبكة بطيئة/إشكالية)
-// يُنفَّذ مبكرًا ومرة أخرى عند اكتمال رد الشبكة لضمان العرض الأسرع
-try {
-    const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
-    if (cached.length) {
+// العناصر الأساسية (تُعرَّف هنا قبل أي استخدام لها)
+const messagesArea = document.getElementById('messagesArea');
+const messageInput = document.getElementById('messageInput');
+let replyTo = null, contextMessageKey = null, reactionTargetKey = null;
+const loadedMessages = new Set();
+
+// عرض رسالة واحدة في المنطقة (تعريف مبكر)
+function renderMessages() {
+    // مسح placeholder القديم إن وجد
+    try {
+        const ph = messagesArea.querySelector('div');
+        if (ph && ph.children.length === 0 && !ph.id) ph.remove();
+    } catch(e) {}
+    // ترتيب الكاش وإعادة رسم كل الرسائل (نمط واتساب: محلي أولاً)
+    try {
+        const cached = JSON.parse(localStorage.getItem('chatCache') || '[]');
+        cached.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        messagesArea.innerHTML = '';
+        loadedMessages.clear();
         cached.forEach(m => {
             loadedMessages.add(m.key);
             appendMessage(m.key, m);
         });
         messagesArea.scrollTop = messagesArea.scrollHeight;
-    }
-} catch(e) {}
+    } catch(e) {}
+}
 
-document.getElementById('headerTitle').textContent = '💬 ' + currentUser.username;
-if (currentUser.role === 'admin') document.getElementById('headerSubtitle').textContent = '👑 مشرف';
-const myAvatar = document.getElementById('myAvatarContainer');
-myAvatar.style.background = getUserColor(currentUser.username);
-myAvatar.textContent = getUserInitial(currentUser.username);
+// جلب أحدث الرسائل من الشبكة وحفظها محليًا ثم العرض
+function loadNetworkMessages() {
+    db.ref('chat/general').orderByChild('timestamp').limitToLast(300).once('value', snap => {
+        try {
+            const val = snap.val() || {};
+            const msgs = Object.entries(val).map(([k, v]) => ({ key: k, ...v }));
+            if (msgs.length) {
+                msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                // حفظ الكاش (بدون صور base64 الثقيلة)
+                const toSave = msgs.filter(m => !m.image).map(m => ({ key: m.key, sender: m.sender, senderId: m.senderId, deviceId: m.deviceId, time: m.time, timestamp: m.timestamp, text: m.text, edited: m.edited, reactions: m.reactions, replyTo: m.replyTo }));
+                localStorage.setItem('chatCache', JSON.stringify(toSave.slice(-300)));
+                renderMessages();
+            }
+        } catch(e) {}
+    });
+}
+
+// 1) العرض الفوري من الكاش المحلي حتى قبل رد الشبكة (شبكة بطيئة/إشكالية)
+renderMessages();
+// 2) الجلب من الشبكة وتحديث الكاش
+loadNetworkMessages();
+
+if (currentUser) {
+    document.getElementById('headerTitle').textContent = '💬 ' + currentUser.username;
+    if (currentUser.role === 'admin') document.getElementById('headerSubtitle').textContent = '👑 مشرف';
+    const myAvatar = document.getElementById('myAvatarContainer');
+    myAvatar.style.background = getUserColor(currentUser.username);
+    myAvatar.textContent = getUserInitial(currentUser.username);
+}
 
 firebase.database().ref(".info/connected").on("value", snap => {
     document.getElementById('connectionIndicator').className = 'connection-dot ' + (snap.val() ? 'online' : 'offline');
@@ -385,11 +403,6 @@ function goBack() {
     if (window.opener && !window.opener.closed) { window.opener.focus(); window.close(); }
     else window.location.href = 'index.html';
 }
-
-const messagesArea = document.getElementById('messagesArea');
-const messageInput = document.getElementById('messageInput');
-let replyTo = null, contextMessageKey = null, reactionTargetKey = null;
-const loadedMessages = new Set();
 
 messageInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } });
 
