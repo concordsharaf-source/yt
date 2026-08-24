@@ -7,7 +7,7 @@
 <script src="firebase-app.js"></script>
 <script src="firebase-database.js"></script>
 <link rel="stylesheet" href="tw.css">
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#1d4ed8">
 <link rel="apple-touch-icon" href="images/icon-192x192.png">
 <script src="config.js"></script>
@@ -391,6 +391,8 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 // ===== FIREBASE =====
 firebase.initializeApp(APP_CONFIG.firebaseConfig);
 const db = firebase.database();
+// الاحتفاظ ببيانات Firebase محلياً حتى يستمر التطبيق بالعمل عند انقطاع الشبكة.
+try { db.setPersistenceEnabled(true); } catch (e) { /* قد تكون مفعّلة مسبقاً */ }
 
 // ===== المستخدمين =====
 // مصدر واحد للحقيقة: APP_CONFIG.users (من config.js) بكلمات مرور مشفرة
@@ -425,6 +427,52 @@ const defaultEmployees = [
 let employees = JSON.parse(JSON.stringify(defaultEmployees));
 let shifts = {};
 let firebaseReady = false;
+
+// ===== بيانات الأوفلاين =====
+const OFFLINE_SHIFTS_KEY = 'yt_offline_shifts_v1';
+const OFFLINE_EMPLOYEES_KEY = 'yt_offline_employees_v1';
+
+function saveOfflineShifts(value) {
+    try { localStorage.setItem(OFFLINE_SHIFTS_KEY, JSON.stringify(value || {})); } catch (e) {}
+}
+
+function saveOfflineEmployees(value) {
+    try { localStorage.setItem(OFFLINE_EMPLOYEES_KEY, JSON.stringify(value || [])); } catch (e) {}
+}
+
+function normalizeEmployees(value) {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (value && typeof value === 'object') return Object.values(value).filter(Boolean);
+    return [];
+}
+
+function restoreOfflineData() {
+    let restored = false;
+    try {
+        const cachedShifts = JSON.parse(localStorage.getItem(OFFLINE_SHIFTS_KEY) || 'null');
+        if (cachedShifts && typeof cachedShifts === 'object' && !Array.isArray(cachedShifts)) {
+            shifts = cachedShifts;
+            restored = true;
+        }
+    } catch (e) {}
+    try {
+        const cachedEmployees = JSON.parse(localStorage.getItem(OFFLINE_EMPLOYEES_KEY) || 'null');
+        const normalizedEmployees = normalizeEmployees(cachedEmployees);
+        if (normalizedEmployees.length) {
+            employees = normalizedEmployees;
+            restored = true;
+        } else {
+            saveOfflineEmployees(employees);
+        }
+    } catch (e) { saveOfflineEmployees(employees); }
+    if (restored) {
+        firebaseReady = true;
+        renderCalendar();
+        renderLandscapeCalendar();
+        renderMobileDayView();
+        renderLegend();
+    }
+}
 
 const arabicMonths = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 const arabicDays = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -812,6 +860,8 @@ function handleOrientationChange() {
 }
 
 function initApp() {
+    // عرض آخر نسخة محفوظة فوراً قبل انتظار الشبكة.
+    restoreOfflineData();
     initConnectionListener();
 
     // Auto-switch between day view and landscape calendar on orientation change
@@ -820,6 +870,7 @@ function initApp() {
     
     db.ref('shifts').on('value', function(snapshot) {
         shifts = snapshot.val() || {};
+        saveOfflineShifts(shifts);
         firebaseReady = true;
         renderCalendar();
         renderLandscapeCalendar();
@@ -829,8 +880,10 @@ function initApp() {
 
     db.ref('employees').on('value', function(snapshot) {
         const data = snapshot.val();
-        if (data !== null && Array.isArray(data) && data.length > 0) {
-            employees = data;
+        const normalizedEmployees = normalizeEmployees(data);
+        if (normalizedEmployees.length > 0) {
+            employees = normalizedEmployees;
+            saveOfflineEmployees(employees);
         }
         renderLegend();
         if (currentUser && currentUser.role === 'admin') {
@@ -1153,8 +1206,9 @@ function autoFillMonth() {
             }
         }
     }
-    if (changed && firebaseReady) {
-        db.ref('shifts').set(shifts);
+    if (changed) {
+        saveOfflineShifts(shifts);
+        if (firebaseReady) db.ref('shifts').set(shifts);
     }
 }
 
@@ -1274,6 +1328,7 @@ function closeModal() {
 function assignEmployee(id) {
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
     shifts[key] = id;
+    saveOfflineShifts(shifts);
     db.ref('shifts').set(shifts);
     renderCalendar();
     renderLandscapeCalendar();
@@ -1285,6 +1340,7 @@ function assignEmployee(id) {
 function clearAssignment() {
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
     delete shifts[key];
+    saveOfflineShifts(shifts);
     db.ref('shifts').set(shifts);
     renderCalendar();
     renderLandscapeCalendar();
@@ -1692,7 +1748,7 @@ function showNotificationRequestBanner() {
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(r) { console.log('SW:', r.scope); }).catch(function(e) { console.log('SW failed:', e); });
+        navigator.serviceWorker.register('./sw.js').then(function(r) { console.log('SW:', r.scope); }).catch(function(e) { console.log('SW failed:', e); });
     });
 }
 </script>

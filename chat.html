@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>الدردشة - قناة اليمن اليوم</title>
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#1d4ed8">
     <link rel="apple-touch-icon" href="images/icon-192x192.png">
     <script src="firebase-app.js"></script>
@@ -14,7 +14,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').then(function(r) { console.log('SW:', r.scope); }).catch(function(e) { console.log('SW failed:', e); });
+                navigator.serviceWorker.register('./sw.js').then(function(r) { console.log('SW:', r.scope); }).catch(function(e) { console.log('SW failed:', e); });
             });
         }
     </script>
@@ -235,6 +235,8 @@
 // ===== FIREBASE =====
 firebase.initializeApp(APP_CONFIG.firebaseConfig);
 const db = firebase.database();
+// إبقاء بيانات Firebase المتاحة على الجهاز عند فقد الاتصال.
+try { db.setPersistenceEnabled(true); } catch (e) { /* قد تكون مفعّلة مسبقاً */ }
 
 // ===== المستخدمون: الثابتون في config.js + المستخدمون المضافون من الأدمن في Firebase =====
 let USERS = Object.assign({}, APP_CONFIG.users);
@@ -271,13 +273,17 @@ let currentUser = null;
         try {
             const parsed = JSON.parse(saved);
             if (!parsed.username) throw new Error('no username');
-            // جلب أحدث بيانات المستخدم من Firebase (حتى لو تغيّرت كلمة المرور في index)
+            const configUser = APP_CONFIG.users[parsed.username] || null;
+            // السماح بالدخول المحلي مباشرةً؛ لا ننتظر الشبكة إذا كانت آخر جلسة صحيحة.
+            if (configUser && parsed.passwordHash === configUser.passwordHash) {
+                currentUser = { username: parsed.username, ...configUser };
+            }
+            // جلب أحدث بيانات المستخدم من Firebase عند توفر الاتصال (حتى لو تغيّرت كلمة المرور في index)
             let fbUser = null;
             try {
                 const snap = await db.ref('users/' + parsed.username).once('value');
                 fbUser = snap.val();
             } catch(e) {}
-            const configUser = APP_CONFIG.users[parsed.username] || null;
             // الهش المفضّل = الأحدث بين Firebase وconfig.js
             const preferredHash = (fbUser && fbUser.passwordHash) || (configUser && configUser.passwordHash) || null;
             const u = USERS[parsed.username] || configUser || (fbUser ? fbUser : null);
