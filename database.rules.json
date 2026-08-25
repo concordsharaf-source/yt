@@ -2,18 +2,22 @@
   "rules": {
     ".read": true,
     "shifts": {
-      ".write": "root.child('users').child('اشرف').child('role').val() === 'admin' || root.child('users').child('شرف').child('role').val() === 'admin'",
+      ".write": "root.child('users').child('شرف').child('role').val() === 'admin'",
       "$date": {
         ".validate": "newData.child('presenter').isString() || newData.val() === null"
       }
     },
     "employees": {
-      ".write": "root.child('users').child('اشرف').child('role').val() === 'admin' || root.child('users').child('شرف').child('role').val() === 'admin'"
+      ".write": "root.child('users').child('شرف').child('role').val() === 'admin'"
+    },
+    "scheduleRules": {
+      ".write": "root.child('users').child('شرف').child('role').val() === 'admin'",
+      ".validate": "newData.hasChildren(['6', '0', '1', '2', '3', '4', '5'])"
     },
     "users": {
       "$username": {
         ".read": "auth != null || root.child('users').child('اشرف').child('role').val() === 'admin'",
-        ".write": "root.child('users').child('اشرف').child('role').val() === 'admin' || root.child('users').child('شرف').child('role').val() === 'admin' || $username === newData.child('id').val()",
+        ".write": "root.child('users').child('شرف').child('role').val() === 'admin'",
         ".validate": "newData.hasChild('passwordHash')"
       }
     },

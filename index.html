@@ -323,9 +323,9 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
             <button onclick="saveSettings()" class="w-full bg-green-500 text-white py-3 rounded-lg mb-6">حفظ التغييرات</button>
         </div>
         <div id="usersAdminSection" class="hidden border-t pt-6 mt-6">
-            <h3 class="text-lg font-bold mb-4 text-gray-800">👥 إدارة المستخدمين</h3>
+            <h3 class="text-lg font-bold mb-4 text-gray-800">👥 إدارة الموظفين والأدمنات</h3>
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-                <p class="text-sm font-bold mb-3">➕ إضافة مستخدم جديد</p>
+                <p class="text-sm font-bold mb-3">➕ إضافة موظف أو أدمن جديد</p>
                 <input type="text" id="newUsername" placeholder="اسم المستخدم" maxlength="30"
                     class="w-full p-3 border border-gray-300 rounded-lg text-right mb-2">
                 <input type="password" id="newUserPassword" placeholder="كلمة المرور الأولية" maxlength="30"
@@ -340,6 +340,14 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
                 </button>
             </div>
             <div id="usersListContainer" class="space-y-2"></div>
+        </div>
+        <div id="scheduleAdminSection" class="hidden border-t pt-6 mt-6">
+            <h3 class="text-lg font-bold mb-2 text-gray-800">🗓️ توزيع الورديات الأسبوعي</h3>
+            <p class="text-sm text-gray-500 mb-4">حدد موظفًا ثابتًا أو أكثر من موظف للتناوب في كل يوم. الجمعة تتناوب تلقائيًا بين كل الموظفين النشطين إذا لم تحدد أسماء.</p>
+            <div id="scheduleRulesContainer" class="space-y-3"></div>
+            <div id="scheduleRulesError" class="text-red-500 text-sm hidden text-center mt-3"></div>
+            <button onclick="saveScheduleRulesFromUI()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl mt-4">💾 حفظ قواعد التوزيع</button>
+            <button onclick="applyScheduleToFuture()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl mt-2">🔄 تطبيق التوزيع على الأيام القادمة</button>
         </div>
         <div class="border-t pt-6 mt-6">
             <h3 class="text-lg font-bold mb-4 text-gray-800">🔐 تغيير كلمة المرور</h3>
@@ -424,6 +432,20 @@ const defaultEmployees = [
     { id: 3, name: 'محمد', color: 'employee-3', bgClass: 'employee-bg-3', image: 'image/3.jpg' },
     { id: 4, name: 'نورا', color: 'employee-4', bgClass: 'employee-bg-4', image: 'image/4.jpg' }
 ];
+
+// قواعد الأسبوع: السبت/الأحد/الإثنين/الثلاثاء ثابتة،
+// الأربعاء والخميس تناوب، والجمعة تناوب تلقائي بين كل الموظفين النشطين.
+const WEEKDAY_NAMES = { 6: 'السبت', 0: 'الأحد', 1: 'الإثنين', 2: 'الثلاثاء', 3: 'الأربعاء', 4: 'الخميس', 5: 'الجمعة' };
+const WEEKDAY_ORDER = [6, 0, 1, 2, 3, 4, 5];
+const DEFAULT_SCHEDULE_RULES = {
+    6: { mode: 'fixed', employeeIds: [1] },
+    0: { mode: 'fixed', employeeIds: [2] },
+    1: { mode: 'fixed', employeeIds: [3] },
+    2: { mode: 'fixed', employeeIds: [4] },
+    3: { mode: 'rotate', employeeIds: [1, 4] },
+    4: { mode: 'rotate', employeeIds: [3, 2] },
+    5: { mode: 'rotate', employeeIds: [] }
+};
 let employees = JSON.parse(JSON.stringify(defaultEmployees));
 let shifts = {};
 let firebaseReady = false;
@@ -431,6 +453,8 @@ let firebaseReady = false;
 // ===== بيانات الأوفلاين =====
 const OFFLINE_SHIFTS_KEY = 'yt_offline_shifts_v1';
 const OFFLINE_EMPLOYEES_KEY = 'yt_offline_employees_v1';
+const OFFLINE_RULES_KEY = 'yt_offline_schedule_rules_v1';
+let scheduleRules = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_RULES));
 
 function saveOfflineShifts(value) {
     try { localStorage.setItem(OFFLINE_SHIFTS_KEY, JSON.stringify(value || {})); } catch (e) {}
@@ -440,10 +464,37 @@ function saveOfflineEmployees(value) {
     try { localStorage.setItem(OFFLINE_EMPLOYEES_KEY, JSON.stringify(value || [])); } catch (e) {}
 }
 
+function saveOfflineRules(value) {
+    try { localStorage.setItem(OFFLINE_RULES_KEY, JSON.stringify(value || DEFAULT_SCHEDULE_RULES)); } catch (e) {}
+}
+
 function normalizeEmployees(value) {
-    if (Array.isArray(value)) return value.filter(Boolean);
-    if (value && typeof value === 'object') return Object.values(value).filter(Boolean);
+    if (Array.isArray(value)) return value.filter(Boolean).map(function(e) {
+        return Object.assign({ disabled: false }, e);
+    });
+    if (value && typeof value === 'object') return Object.values(value).filter(Boolean).map(function(e) {
+        return Object.assign({ disabled: false }, e);
+    });
     return [];
+}
+
+function normalizeScheduleRules(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const merged = JSON.parse(JSON.stringify(DEFAULT_SCHEDULE_RULES));
+    Object.keys(merged).forEach(function(day) {
+        const rule = source[day];
+        if (rule && Array.isArray(rule.employeeIds)) {
+            merged[day] = {
+                mode: rule.mode === 'fixed' ? 'fixed' : 'rotate',
+                employeeIds: rule.employeeIds.map(Number).filter(Number.isFinite)
+            };
+        }
+    });
+    return merged;
+}
+
+function getActiveEmployees() {
+    return employees.filter(function(e) { return e && !e.disabled; });
 }
 
 function restoreOfflineData() {
@@ -465,6 +516,15 @@ function restoreOfflineData() {
             saveOfflineEmployees(employees);
         }
     } catch (e) { saveOfflineEmployees(employees); }
+    try {
+        const cachedRules = JSON.parse(localStorage.getItem(OFFLINE_RULES_KEY) || 'null');
+        if (cachedRules) {
+            scheduleRules = normalizeScheduleRules(cachedRules);
+            restored = true;
+        } else {
+            saveOfflineRules(scheduleRules);
+        }
+    } catch (e) { saveOfflineRules(scheduleRules); }
     if (restored) {
         firebaseReady = true;
         renderCalendar();
@@ -486,7 +546,7 @@ async function checkAutoLogin() {
     if (saved) {
         try {
             const user = JSON.parse(saved);
-            if (user.username && USERS[user.username] && user.passwordHash && user.sessionToken) {
+            if (user.username && USERS[user.username] && !USERS[user.username].disabled && user.passwordHash && user.sessionToken) {
                 // الجلسة دائمة: الجلسة السابقة ناتجة عن تسجيل دخول صحيح فعلياً (رمز الجلسة رمز عشوائي
                 // لا يمكن تخمينه ولا يوجد إلا في جهاز المستخدم) — لا نُخرج المستخدم عند تحديث الصفحة
                 const fbHash = USERS[user.username].passwordHash;
@@ -528,6 +588,7 @@ async function checkAutoLogin() {
 async function performLogin(user) {
     const username = user.username;
     const password = user.password || __pendingPassword__;
+    if (!USERS[username] || USERS[username].disabled) throw new Error('الحساب معطّل');
     currentUser = { username: username, ...USERS[username] };
 
     // إصدار رمز جلسة والتحقق من كلمة المرور
@@ -567,8 +628,8 @@ async function handleLogin() {
     const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
 
-    if (!USERS[username]) {
-        errorEl.textContent = '❌ اسم المستخدم غير صحيح، تأكد من كتابة الاسم كما هو مسجل';
+    if (!USERS[username] || USERS[username].disabled) {
+        errorEl.textContent = USERS[username] && USERS[username].disabled ? '❌ هذا الحساب معطّل، راجع مالك التطبيق' : '❌ اسم المستخدم غير صحيح، تأكد من كتابة الاسم كما هو مسجل';
         errorEl.classList.remove('hidden');
         __pendingPassword__ = '';
         document.getElementById('loginPassword').value = '';
@@ -886,9 +947,24 @@ function initApp() {
             saveOfflineEmployees(employees);
         }
         renderLegend();
-        if (currentUser && currentUser.role === 'admin') {
+        if (isSuperAdmin()) {
             renderSettings();
+            renderScheduleRules();
         }
+    });
+
+    db.ref('scheduleRules').on('value', function(snapshot) {
+        const data = snapshot.val();
+        if (data) {
+            scheduleRules = normalizeScheduleRules(data);
+            saveOfflineRules(scheduleRules);
+        } else {
+            saveOfflineRules(scheduleRules);
+        }
+        renderScheduleRules();
+        renderCalendar();
+        renderLandscapeCalendar();
+        renderMobileDayView();
     });
     
     startListeningForChatNotifications();
@@ -968,68 +1044,71 @@ function showPage(page) {
     if (page === 'settings') {
         const adminPanel = document.getElementById('settingsAdminPanel');
         const usersAdminSection = document.getElementById('usersAdminSection');
-        if (currentUser && currentUser.role === 'admin') {
+        if (currentUser && currentUser.role === 'admin' && isSuperAdmin()) {
             adminPanel.classList.remove('hidden');
             renderSettings();
             if (usersAdminSection) {
                 if (isSuperAdmin()) {
                     usersAdminSection.classList.remove('hidden');
+                    const scheduleSection = document.getElementById('scheduleAdminSection');
+                    if (scheduleSection) scheduleSection.classList.remove('hidden');
                     syncAdminUsers();
                     renderUsersList();
+                    renderScheduleRules();
                 } else {
                     usersAdminSection.classList.add('hidden');
+                    const scheduleSection = document.getElementById('scheduleAdminSection');
+                    if (scheduleSection) scheduleSection.classList.add('hidden');
                 }
             }
         } else {
             adminPanel.classList.add('hidden');
             if (usersAdminSection) usersAdminSection.classList.add('hidden');
+            const scheduleSection = document.getElementById('scheduleAdminSection');
+            if (scheduleSection) scheduleSection.classList.add('hidden');
         }
     }
 }
 
 // ===== الورديات =====
-function getEmployeeForDate(date) {
+function formatDateKey(date) {
+    return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
+}
+
+function getAutomaticEmployeeForDate(date) {
     const startDate = new Date(2026, 7, 1);
     const currentDay = new Date(date);
     const dayOfWeek = currentDay.getDay();
-    const key = `${currentDay.getFullYear()}-${currentDay.getMonth()+1}-${currentDay.getDate()}`;
-    
-    if (shifts[key]) return employees.find(function(e) { return e.id === shifts[key]; }) || null;
-    
-    let employeeId = null;
-    if (dayOfWeek === 6) employeeId = 1;
-    else if (dayOfWeek === 0) employeeId = 2;
-    else if (dayOfWeek === 1) employeeId = 3;
-    else if (dayOfWeek === 2) employeeId = 4;
-    else if (dayOfWeek === 3) {
-        let count = 0, temp = new Date(startDate);
-        while (temp <= currentDay) {
-            if (temp.getDay() === 3) count++;
-            temp.setDate(temp.getDate() + 1);
-        }
-        employeeId = (count % 2 === 1) ? 1 : 4;
+    const active = getActiveEmployees();
+    if (!active.length) return null;
+
+    const rule = scheduleRules[dayOfWeek] || { mode: 'rotate', employeeIds: [] };
+    let candidates = (rule.employeeIds || []).map(Number)
+        .map(function(id) { return active.find(function(e) { return e.id === id; }); })
+        .filter(Boolean);
+    // الجمعة افتراضيًا تتناوب بين كل الموظفين النشطين.
+    if (!candidates.length && rule.mode === 'rotate') candidates = active.slice();
+    if (!candidates.length) return null;
+    if (rule.mode !== 'rotate') return candidates[0];
+
+    let occurrence = 0;
+    const cursor = new Date(startDate);
+    while (cursor <= currentDay) {
+        if (cursor.getDay() === dayOfWeek) occurrence++;
+        cursor.setDate(cursor.getDate() + 1);
     }
-    else if (dayOfWeek === 4) {
-        let count = 0, temp = new Date(startDate);
-        while (temp <= currentDay) {
-            if (temp.getDay() === 4) count++;
-            temp.setDate(temp.getDate() + 1);
-        }
-        employeeId = (count % 2 === 1) ? 3 : 2;
+    return candidates[(Math.max(occurrence, 1) - 1) % candidates.length] || null;
+}
+
+function getEmployeeForDate(date) {
+    const key = formatDateKey(new Date(date));
+    const active = getActiveEmployees();
+    // التعيين اليدوي من داخل التقويم له الأولوية على القاعدة الأسبوعية.
+    if (shifts[key]) {
+        const manualEmployee = active.find(function(e) { return e.id === Number(shifts[key]); });
+        if (manualEmployee) return manualEmployee;
     }
-    else if (dayOfWeek === 5) {
-        let count = 0, temp = new Date(startDate);
-        while (temp <= currentDay) {
-            if (temp.getDay() === 5) count++;
-            temp.setDate(temp.getDate() + 1);
-        }
-        let mod = count % 4;
-        if (mod === 1) employeeId = 4;
-        else if (mod === 2) employeeId = 2;
-        else if (mod === 3) employeeId = 1;
-        else employeeId = 3;
-    }
-    return employees.find(function(e) { return e.id === employeeId; }) || null;
+    return getAutomaticEmployeeForDate(date);
 }
 
 function getNextFriday(date) {
@@ -1372,13 +1451,102 @@ function renderStats() {
 
 // ===== الإعدادات =====
 function renderSettings() {
-    if (!document.getElementById('settingsContainer')) return;
+    if (!isSuperAdmin() || !document.getElementById('settingsContainer')) return;
     document.getElementById('settingsContainer').innerHTML = employees.map(function(e, i) {
         return `<div>
             <label class="text-sm text-gray-500">الموظف ${i+1}</label>
             <input id="emp${i}" value="${e.name}" class="w-full p-3 border rounded-lg mt-1">
         </div>`;
     }).join('');
+}
+
+// ===== إعداد توزيع الورديات =====
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>\"']/g, function(ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#039;' })[ch];
+    });
+}
+
+function renderScheduleRules() {
+    if (!isSuperAdmin()) return;
+    const container = document.getElementById('scheduleRulesContainer');
+    if (!container) return;
+    const active = getActiveEmployees();
+    container.innerHTML = WEEKDAY_ORDER.map(function(day) {
+        const rule = scheduleRules[day] || { mode: 'rotate', employeeIds: [] };
+        const selected = (rule.employeeIds || []).map(Number);
+        const options = active.length ? active.map(function(e) {
+            return '<option value="' + e.id + '" ' + (selected.includes(Number(e.id)) ? 'selected' : '') + '>' + escapeHtml(e.name) + '</option>';
+        }).join('') : '<option disabled>لا يوجد موظفون نشطون</option>';
+        return '<div class="border rounded-xl p-3 bg-gray-50">' +
+            '<div class="font-bold mb-2">' + WEEKDAY_NAMES[day] + '</div>' +
+            '<select id="scheduleMode-' + day + '" class="w-full p-2 border rounded-lg mb-2 bg-white">' +
+                '<option value="fixed" ' + (rule.mode === 'fixed' ? 'selected' : '') + '>موظف ثابت</option>' +
+                '<option value="rotate" ' + (rule.mode === 'rotate' ? 'selected' : '') + '>بالتناوب</option>' +
+            '</select>' +
+            '<select id="scheduleEmployees-' + day + '" multiple size="' + Math.min(Math.max(active.length, 2), 5) + '" class="w-full p-2 border rounded-lg bg-white">' + options + '</select>' +
+            '<p class="text-xs text-gray-500 mt-1">في التناوب اختر أكثر من موظف. إذا تركت الجمعة بلا اختيار فستتناوب تلقائيًا بين كل النشطين.</p>' +
+        '</div>';
+    }).join('');
+}
+
+async function saveScheduleRulesFromUI() {
+    if (!isSuperAdmin()) { showToast('❌ هذه الخاصية حصرية للمالك «شرف»'); return; }
+    const errorEl = document.getElementById('scheduleRulesError');
+    if (errorEl) errorEl.classList.add('hidden');
+    const next = {};
+    for (const day of WEEKDAY_ORDER) {
+        const modeEl = document.getElementById('scheduleMode-' + day);
+        const employeesEl = document.getElementById('scheduleEmployees-' + day);
+        if (!modeEl || !employeesEl) continue;
+        let employeeIds = Array.from(employeesEl.selectedOptions).map(function(o) { return Number(o.value); }).filter(Number.isFinite);
+        if (modeEl.value === 'fixed') employeeIds = employeeIds.slice(0, 1);
+        if (modeEl.value === 'fixed' && !employeeIds.length) {
+            if (errorEl) { errorEl.textContent = '❌ اختر موظفًا ثابتًا ليوم ' + WEEKDAY_NAMES[day]; errorEl.classList.remove('hidden'); }
+            return;
+        }
+        next[day] = { mode: modeEl.value === 'fixed' ? 'fixed' : 'rotate', employeeIds: employeeIds };
+    }
+    scheduleRules = normalizeScheduleRules(next);
+    saveOfflineRules(scheduleRules);
+    try {
+        await db.ref('scheduleRules').set(scheduleRules);
+        await writeAuditLog('تعديل توزيع الورديات', currentUser.username, 'تم تحديث قواعد الأسبوع');
+        renderCalendar();
+        renderLandscapeCalendar();
+        renderMobileDayView();
+        showToast('✅ تم حفظ قواعد توزيع الورديات');
+    } catch (e) {
+        if (errorEl) { errorEl.textContent = '❌ تعذر الحفظ، سيتم الاحتفاظ بها محليًا حتى عودة الاتصال'; errorEl.classList.remove('hidden'); }
+        showToast('تم حفظ القواعد محليًا');
+    }
+}
+
+async function applyScheduleToFuture() {
+    if (!isSuperAdmin()) { showToast('❌ هذه الخاصية حصرية للمالك «شرف»'); return; }
+    if (!confirm('سيتم إعادة توزيع الورديات من اليوم وحتى سنة قادمة حسب القواعد الحالية، مع استبدال التعيينات اليدوية في هذه الفترة. هل تريد المتابعة؟')) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const end = new Date(today);
+    end.setFullYear(end.getFullYear() + 1);
+    const preserved = {};
+    Object.keys(shifts).forEach(function(key) {
+        const parts = key.split('-').map(Number);
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        if (!Number.isNaN(date.getTime()) && date < today) preserved[key] = shifts[key];
+    });
+    const generated = {};
+    for (let cursor = new Date(today); cursor < end; cursor.setDate(cursor.getDate() + 1)) {
+        const employee = getAutomaticEmployeeForDate(cursor);
+        if (employee) generated[formatDateKey(cursor)] = employee.id;
+    }
+    shifts = Object.assign({}, preserved, generated);
+    saveOfflineShifts(shifts);
+    try { await db.ref('shifts').set(shifts); } catch (e) {}
+    renderCalendar();
+    renderLandscapeCalendar();
+    renderMobileDayView();
+    showToast('✅ تم تطبيق التوزيع على الأيام القادمة');
 }
 
 // ===== تبديل نموذج تغيير كلمة المرور =====
@@ -1480,6 +1648,10 @@ function getUsersList() {
     Object.keys(usersCache).forEach(function(u) {
         if (!merged[u]) merged[u] = usersCache[u];
     });
+    Object.keys(USERS).forEach(function(u) {
+        if (merged[u]) merged[u] = Object.assign({}, merged[u], USERS[u]);
+        else merged[u] = Object.assign({}, USERS[u]);
+    });
     return merged;
 }
 
@@ -1507,6 +1679,54 @@ function renderUsersList() {
     container.innerHTML = html || '<p class="text-gray-400 text-sm text-center">لا يوجد مستخدمون</p>';
 }
 
+function getNextEmployeeId(users) {
+    const ids = Object.keys(users || {}).map(function(u) { return Number(users[u].id) || 0; });
+    employees.forEach(function(e) { ids.push(Number(e.id) || 0); });
+    return Math.max.apply(null, ids.concat([0])) + 1;
+}
+
+function getEmployeeStyle(id) {
+    const styles = [
+        { color: 'employee-1', bgClass: 'employee-bg-1' },
+        { color: 'employee-2', bgClass: 'employee-bg-2' },
+        { color: 'employee-3', bgClass: 'employee-bg-3' },
+        { color: 'employee-4', bgClass: 'employee-bg-4' }
+    ];
+    return styles[(Math.max(Number(id) || 1, 1) - 1) % styles.length];
+}
+
+function createEmployeeProfile(name, id) {
+    const style = getEmployeeStyle(id);
+    return { id: Number(id), name: name, color: style.color, bgClass: style.bgClass, image: 'images/icon-192x192.png', disabled: false };
+}
+
+function repairScheduleRules() {
+    const activeIds = getActiveEmployees().map(function(e) { return Number(e.id); });
+    Object.keys(scheduleRules).forEach(function(day) {
+        const rule = scheduleRules[day];
+        rule.employeeIds = (rule.employeeIds || []).map(Number).filter(function(id) { return activeIds.includes(id); });
+        if (rule.mode === 'fixed' && !rule.employeeIds.length) {
+            rule.employeeIds = activeIds.length ? [activeIds[0]] : [];
+        }
+    });
+    scheduleRules = normalizeScheduleRules(scheduleRules);
+    saveOfflineRules(scheduleRules);
+}
+
+function removeEmployeeFromSchedule(employeeId) {
+    Object.keys(scheduleRules).forEach(function(day) {
+        scheduleRules[day].employeeIds = (scheduleRules[day].employeeIds || []).filter(function(id) { return Number(id) !== Number(employeeId); });
+    });
+    repairScheduleRules();
+}
+
+async function persistEmployeeData() {
+    saveOfflineEmployees(employees);
+    saveOfflineRules(scheduleRules);
+    await db.ref('employees').set(employees);
+    await db.ref('scheduleRules').set(scheduleRules);
+}
+
 async function addNewUser() {
     const errorEl = document.getElementById('addUserError');
     const name = document.getElementById('newUsername').value.trim();
@@ -1526,21 +1746,31 @@ async function addNewUser() {
         errorEl.textContent = '❌ هذا الاسم مستخدم بالفعل'; errorEl.classList.remove('hidden'); return;
     }
     const users = getUsersList();
-    let maxId = 0;
-    Object.keys(users).forEach(function(u) { if ((users[u].id || 0) > maxId) maxId = users[u].id; });
+    const newId = getNextEmployeeId(users);
     const hash = await hashPassword(pass);
-    const newUser = { id: maxId + 1, role: role, passwordHash: hash, addedByAdmin: true };
+    const newUser = { id: newId, role: role, passwordHash: hash, addedByAdmin: true, disabled: false };
+    const employeeProfile = role === 'employee' ? createEmployeeProfile(name, newId) : null;
     try {
-        await db.ref('users/' + name).set(newUser);
-        await writeAuditLog('إضافة مستخدم', name, 'أصبح: ' + (role === 'admin' ? 'أدمن' : 'موظف'));
+        // Firebase يحتفظ بالكتابة محليًا عند انقطاع الشبكة ويرسلها بعد عودتها.
+        db.ref('users/' + name).set(newUser).catch(function() {});
+        if (employeeProfile) {
+            employees.push(employeeProfile);
+            saveOfflineEmployees(employees);
+            db.ref('employees').set(employees).catch(function() {});
+        }
+        usersCache[name] = newUser;
+        USERS[name] = newUser;
+        writeAuditLog('إضافة مستخدم', name, 'أصبح: ' + (role === 'admin' ? 'أدمن' : 'موظف'));
     } catch (e) {
-        errorEl.textContent = '❌ فشل الحفظ، تأكد من اتصالك بالإنترنت'; errorEl.classList.remove('hidden'); return;
+        errorEl.textContent = '❌ تعذر تجهيز المستخدم الجديد'; errorEl.classList.remove('hidden'); return;
     }
-    USERS[name] = newUser;
     // تفريغ الحقول وتحديث القائمة
     document.getElementById('newUsername').value = '';
     document.getElementById('newUserPassword').value = '';
     renderUsersList();
+    renderSettings();
+    renderScheduleRules();
+    renderLegend();
     showToast('✅ تمت إضافة المستخدم ' + name + ' (' + (role === 'admin' ? 'أدمن' : 'موظف') + ')');
 }
 
@@ -1551,34 +1781,74 @@ async function toggleUserRole(username) {
     const newRole = users[username].role === 'admin' ? 'employee' : 'admin';
     users[username].role = newRole;
     USERS[username] = Object.assign({}, users[username]);
-    try { await db.ref('users/' + username).set(users[username]);
-    await writeAuditLog('تحويل صلاحية', username, 'أصبح: ' + (newRole === 'admin' ? 'أدمن' : 'موظف')); } catch (e) {
-        showToast('❌ فشل تحديث الصلاحية'); return;
+    usersCache[username] = USERS[username];
+    const employeeIndex = employees.findIndex(function(e) { return e.name === username || Number(e.id) === Number(users[username].id); });
+    if (newRole === 'employee' && employeeIndex < 0) {
+        employees.push(createEmployeeProfile(username, users[username].id));
+    } else if (newRole === 'admin' && employeeIndex >= 0) {
+        const removed = employees.splice(employeeIndex, 1)[0];
+        removeEmployeeFromSchedule(removed.id);
     }
+    saveOfflineEmployees(employees);
+    db.ref('users/' + username).set(users[username]).catch(function() {});
+    db.ref('employees').set(employees).catch(function() {});
+    writeAuditLog('تحويل صلاحية', username, 'أصبح: ' + (newRole === 'admin' ? 'أدمن' : 'موظف'));
     renderUsersList();
+    renderSettings();
+    renderScheduleRules();
+    renderLegend();
     showToast('✅ تم تحويل ' + username + ' إلى ' + (newRole === 'admin' ? 'أدمن' : 'موظف'));
 }
 
 async function removeUser(username) {
     if (!isSuperAdmin()) { showToast('❌ هذه الخاصية حصرية للمالك «شرف»'); return; }
-    if (!confirm('هل أنت متأكد من حذف المستخدم «' + username + '»؟\nسيتم إنهاء جميع جلساته ومنعه من الدخول.')) return;
+    if (!confirm('هل أنت متأكد من حذف المستخدم «' + username + '»؟\nسيتم إنهاء جميع جلساته وإزالته من جدول التوزيع.')) return;
     if (username === currentUser.username) {
         showToast('❌ لا يمكنك حذف حسابك الحالي'); return;
+    }
+    const users = getUsersList();
+    const target = users[username];
+    if (!target) return;
+    const employeeIndex = employees.findIndex(function(e) { return e.name === username || Number(e.id) === Number(target.id); });
+    if (employeeIndex >= 0) {
+        const removed = employees.splice(employeeIndex, 1)[0];
+        removeEmployeeFromSchedule(removed.id);
+        Object.keys(shifts).forEach(function(key) {
+            if (Number(shifts[key]) === Number(removed.id)) delete shifts[key];
+        });
+        saveOfflineShifts(shifts);
     }
     delete USERS[username];
     delete usersCache[username];
     try {
-        await db.ref('users/' + username).remove();
+        // الحسابات المضافة تُحذف نهائيًا، بينما الحسابات الأساسية تُعطّل فقط.
+        if (APP_CONFIG.users[username]) {
+            const disabledUser = Object.assign({}, target, { disabled: true });
+            USERS[username] = disabledUser;
+            await db.ref('users/' + username).set(disabledUser);
+        } else {
+            await db.ref('users/' + username).remove();
+        }
         await db.ref('sessions/' + username).remove();
-        await writeAuditLog('حذف مستخدم', username, 'أُنهي جميع جلساته');
-    } catch (e) { showToast('❌ فشل الحذف'); return; }
+        await db.ref('employees').set(employees);
+        await db.ref('shifts').set(shifts);
+        await db.ref('scheduleRules').set(scheduleRules);
+        await writeAuditLog('حذف مستخدم', username, 'أُنهيت جلساته وأزيل من التوزيع');
+    } catch (e) { showToast('❌ تعذر مزامنة الحذف، لكن التغيير محفوظ محليًا'); }
+    saveOfflineEmployees(employees);
     renderUsersList();
+    renderSettings();
+    renderScheduleRules();
+    renderLegend();
+    renderCalendar();
+    renderLandscapeCalendar();
+    renderMobileDayView();
     showToast('🗑️ تم حذف المستخدم ' + username);
 }
 
 // هل المستخدم الحالي هو المالك الوحيد صاحب صلاحية إدارة المستخدمين
 function isSuperAdmin() {
-    return !!(currentUser && currentUser.username === 'شرف');
+    return !!(currentUser && currentUser.username === 'شرف' && currentUser.role === 'admin');
 }
 
 // تسجيل أمني لأي إضافة أو حذف أو تحويل في قسم إدارة المستخدمين
@@ -1599,9 +1869,10 @@ function syncAdminUsers() {
     db.ref('users').once('value').then(function(snap) {
         const fb = snap.val() || {};
         usersCache = {};
-        Object.keys(fb).forEach(function(u) {
-            if (!APP_CONFIG.users[u] && fb[u] && fb[u].passwordHash) {
-                usersCache[u] = fb[u];
+            Object.keys(fb).forEach(function(u) {
+            if (fb[u] && fb[u].passwordHash) {
+                USERS[u] = Object.assign({}, APP_CONFIG.users[u] || {}, fb[u]);
+                if (!APP_CONFIG.users[u]) usersCache[u] = USERS[u];
             }
         });
         // إعادة رسم القائمة فوراً — حتى تظهر تلقائياً دون الحاجة لإضافة أدمن جديد
@@ -1610,12 +1881,13 @@ function syncAdminUsers() {
 }
 
 function saveSettings() {
-    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!isSuperAdmin()) { showToast('❌ هذه الخاصية حصرية للمالك «شرف»'); return; }
     employees.forEach(function(e, i) {
         const input = document.getElementById('emp' + i);
         if (input) e.name = input.value;
     });
-    db.ref('employees').set(employees);
+    saveOfflineEmployees(employees);
+    db.ref('employees').set(employees).catch(function() {});
     renderCalendar();
     renderLandscapeCalendar();
     renderLegend();
