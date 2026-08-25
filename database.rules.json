@@ -4,7 +4,7 @@
     "shifts": {
       ".write": "root.child('users').child('شرف').child('role').val() === 'admin'",
       "$date": {
-        ".validate": "newData.child('presenter').isString() || newData.val() === null"
+        ".validate": "newData.isNumber() || newData.child('presenter').isString() || newData.val() === null"
       }
     },
     "employees": {

@@ -1422,26 +1422,49 @@ function closeModal() {
 
 function assignEmployee(id) {
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
-    shifts[key] = id;
+    const previousValue = shifts[key];
+    shifts[key] = Number(id);
     saveOfflineShifts(shifts);
-    db.ref('shifts').set(shifts);
     renderCalendar();
     renderLandscapeCalendar();
     renderMobileDayView();
     closeModal();
-    showToast('تم تعديل الوردية');
+    showToast('جارٍ حفظ تعديل الوردية…');
+    db.ref('shifts').update({ [key]: Number(id) }).then(function() {
+        showToast('✅ تم حفظ تعديل الوردية');
+    }).catch(function(error) {
+        if (previousValue === undefined) delete shifts[key];
+        else shifts[key] = previousValue;
+        saveOfflineShifts(shifts);
+        renderCalendar();
+        renderLandscapeCalendar();
+        renderMobileDayView();
+        showToast('❌ تعذر حفظ الوردية؛ تحقق من نشر قواعد Firebase');
+        console.error('assignEmployee failed:', error);
+    });
 }
 
 function clearAssignment() {
     const key = `${currentDate.getFullYear()}-${currentDate.getMonth()+1}-${selectedDay}`;
+    const previousValue = shifts[key];
     delete shifts[key];
     saveOfflineShifts(shifts);
-    db.ref('shifts').set(shifts);
     renderCalendar();
     renderLandscapeCalendar();
     renderMobileDayView();
     closeModal();
-    showToast('تم حذف الوردية');
+    showToast('جارٍ حذف الوردية…');
+    db.ref('shifts/' + key).remove().then(function() {
+        showToast('✅ تم حذف الوردية');
+    }).catch(function(error) {
+        if (previousValue !== undefined) shifts[key] = previousValue;
+        saveOfflineShifts(shifts);
+        renderCalendar();
+        renderLandscapeCalendar();
+        renderMobileDayView();
+        showToast('❌ تعذر حذف الوردية؛ تحقق من نشر قواعد Firebase');
+        console.error('clearAssignment failed:', error);
+    });
 }
 
 // ===== الإحصائيات =====

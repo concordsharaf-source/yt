@@ -1,6 +1,6 @@
 // ===== Service Worker - وضع الأوفلاين والإشعارات =====
 // يخزّن ملفات التطبيق محلياً، ثم يستخدمها عند عدم توفر الشبكة.
-const CACHE_NAME = 'yt-calendar-offline-v5';
+const CACHE_NAME = 'yt-calendar-offline-v6';
 const ICON = './images/icon-192x192.png';
 const APP_URL = './index.html';
 const APP_SHELL = [
