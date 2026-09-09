@@ -88,10 +88,14 @@
         .header-title { font-size: 1.05rem; font-weight: 700; line-height: 1.2; }
         .header-sub { font-size: 0.72rem; color: #8696a0; }
         .connection-dot {
-            width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: 4px;
+            width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+            box-shadow: 0 0 8px currentColor;
         }
-        .connection-dot.online { background: #25d366; }
-        .connection-dot.offline { background: #ef4444; }
+        .connection-dot.online { background: #22c55e; color: #22c55e; }
+        .connection-dot.offline { background: #ef4444; color: #ef4444; }
+        .header-avatar img, .msg-avatar img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;
+        }
 
         .messages-area {
             flex: 1;
@@ -121,12 +125,12 @@
         .message-row.received { align-self: flex-start; }
         .message-row.highlight .msg-bubble { box-shadow: 0 0 0 2px #25d366; }
         .msg-avatar {
-            width: 28px; height: 28px; border-radius: 50%;
+            width: 36px; height: 36px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700; color: #fff; font-size: 0.75rem;
+            font-weight: 700; color: #fff; font-size: 0.8rem;
             flex-shrink: 0; align-self: flex-end; margin-bottom: 2px;
+            overflow: hidden; background: #374151;
         }
-        .sent .msg-avatar { display: none; }
         .msg-content { display: flex; flex-direction: column; min-width: 80px; max-width: 100%; }
         .msg-sender-name { font-size: 0.78rem; font-weight: 700; margin: 0 8px 2px; }
         .msg-bubble {
@@ -408,24 +412,72 @@ let currentUser = null;
     }
     if (currentUser) {
         document.getElementById('headerSubtitle').textContent = currentUser.username + (currentUser.role === 'admin' ? ' · مشرف' : '');
-        const myAvatar = document.getElementById('myAvatarContainer');
-        myAvatar.style.background = getUserColor(currentUser.username);
-        myAvatar.textContent = getUserInitial(currentUser.username);
+        setAvatarEl(document.getElementById('myAvatarContainer'), currentUser.username);
     }
 })();
 
 const userColors = {
-    'زكريا': '#02a698', 'منسور': '#f59e0b', 'منصور': '#f59e0b', 'محمد': '#53bdeb',
+    'زكريا': '#02a698', 'منصور': '#f59e0b', 'محمد': '#53bdeb',
     'نورا': '#ef4444', 'اشرف': '#00a884', 'شرف': '#a855f7'
 };
+const defaultPhotos = {
+    'زكريا': 'image/1.jpg',
+    'منصور': 'image/2.jpg',
+    'محمد': 'image/3.jpg',
+    'نورا': 'image/4.jpg'
+};
+let employeePhotos = Object.assign({}, defaultPhotos);
+
+function loadEmployeePhotos() {
+    try {
+        const cached = JSON.parse(localStorage.getItem('yt_offline_employees_v1') || 'null');
+        if (Array.isArray(cached)) {
+            cached.forEach(function(e) {
+                if (e && e.name && e.image) employeePhotos[e.name] = e.image;
+            });
+        }
+    } catch (e) {}
+    db.ref('employees').on('value', function(snap) {
+        const data = snap.val();
+        const list = Array.isArray(data) ? data : (data ? Object.values(data) : []);
+        list.forEach(function(e) {
+            if (e && e.name && e.image) employeePhotos[e.name] = e.image;
+        });
+        document.querySelectorAll('.msg-avatar[data-user], .header-avatar[data-user]').forEach(function(el) {
+            setAvatarEl(el, el.getAttribute('data-user'));
+        });
+    });
+}
+loadEmployeePhotos();
+
 function getUserColor(u) { return userColors[u] || '#00a884'; }
 function getUserInitial(u) { return u ? u.charAt(0) : '?'; }
+function getUserPhoto(u) { return employeePhotos[u] || defaultPhotos[u] || ''; }
+
+function setAvatarEl(el, username) {
+    if (!el) return;
+    el.setAttribute('data-user', username || '');
+    el.title = username || '';
+    el.style.background = getUserColor(username);
+    const src = getUserPhoto(username);
+    el.innerHTML = '';
+    if (src) {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = username || '';
+        img.onerror = function() {
+            el.innerHTML = '';
+            el.textContent = getUserInitial(username);
+        };
+        el.appendChild(img);
+    } else {
+        el.textContent = getUserInitial(username);
+    }
+}
 function createAvatarElement(username) {
     const div = document.createElement('div');
     div.className = 'msg-avatar';
-    div.style.background = getUserColor(username);
-    div.textContent = getUserInitial(username);
-    div.title = username;
+    setAvatarEl(div, username);
     return div;
 }
 
