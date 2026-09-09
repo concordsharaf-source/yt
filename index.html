@@ -20,6 +20,10 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 .employee-2 { background-color:#f59e0b; color:white; }
 .employee-3 { background-color:#3b82f6; color:white; }
 .employee-4 { background-color:#ef4444; color:white; }
+.employee-5 { background-color:#8b5cf6; color:white; }
+.employee-6 { background-color:#ec4899; color:white; }
+.employee-7 { background-color:#06b6d4; color:white; }
+.employee-8 { background-color:#64748b; color:white; }
 .today-highlight { box-shadow: inset 0 0 0 4px #000000; }
 .modal-overlay { background-color:rgba(0,0,0,.5); backdrop-filter:blur(4px); }
 .mobile-day-view { display: none; min-height: 100vh; overflow-x: hidden; }
@@ -47,6 +51,10 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 .employee-bg-2 { background: linear-gradient(135deg, #78350f, #f59e0b); }
 .employee-bg-3 { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
 .employee-bg-4 { background: linear-gradient(135deg, #7f1d1d, #ef4444); }
+.employee-bg-5 { background: linear-gradient(135deg, #4c1d95, #8b5cf6); }
+.employee-bg-6 { background: linear-gradient(135deg, #831843, #ec4899); }
+.employee-bg-7 { background: linear-gradient(135deg, #164e63, #06b6d4); }
+.employee-bg-8 { background: linear-gradient(135deg, #1e293b, #64748b); }
 .pulse-ring { animation: pulse-ring 2s infinite; }
 @keyframes pulse-ring {
     0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
@@ -1664,9 +1672,15 @@ function nextStatsYear() {
 function renderSettings() {
     if (!isSuperAdmin() || !document.getElementById('settingsContainer')) return;
     document.getElementById('settingsContainer').innerHTML = employees.map(function(e, i) {
+        const colorOptions = getEmployeeColorOptions(e.color);
         return `<div>
             <label class="text-sm text-gray-500">الموظف ${i+1}</label>
-            <input id="emp${i}" value="${e.name}" class="w-full p-3 border rounded-lg mt-1">
+            <div class="flex items-center gap-2 mt-1">
+                <input id="emp${i}" value="${escapeHtml(e.name)}" class="flex-1 min-w-0 p-3 border rounded-lg">
+                <select id="empColor${i}" class="w-32 p-3 border rounded-lg bg-white" title="لون الموظف">
+                    ${colorOptions}
+                </select>
+            </div>
         </div>`;
     }).join('');
 }
@@ -1938,9 +1952,31 @@ function getEmployeeStyle(id) {
         { color: 'employee-1', bgClass: 'employee-bg-1' },
         { color: 'employee-2', bgClass: 'employee-bg-2' },
         { color: 'employee-3', bgClass: 'employee-bg-3' },
-        { color: 'employee-4', bgClass: 'employee-bg-4' }
+        { color: 'employee-4', bgClass: 'employee-bg-4' },
+        { color: 'employee-5', bgClass: 'employee-bg-5' },
+        { color: 'employee-6', bgClass: 'employee-bg-6' },
+        { color: 'employee-7', bgClass: 'employee-bg-7' },
+        { color: 'employee-8', bgClass: 'employee-bg-8' }
     ];
     return styles[(Math.max(Number(id) || 1, 1) - 1) % styles.length];
+}
+
+function getEmployeeColorOptions(selected) {
+    const colors = [
+        ['employee-1', 'أخضر'], ['employee-2', 'برتقالي'],
+        ['employee-3', 'أزرق'], ['employee-4', 'أحمر'],
+        ['employee-5', 'بنفسجي'], ['employee-6', 'وردي'],
+        ['employee-7', 'سماوي'], ['employee-8', 'رمادي']
+    ];
+    return colors.map(function(item) {
+        return '<option value="' + item[0] + '" ' + (item[0] === selected ? 'selected' : '') + '>' + item[1] + '</option>';
+    }).join('');
+}
+
+function getEmployeeStyleByColor(color) {
+    const match = /^employee-([1-8])$/.exec(String(color || ''));
+    const index = match ? Number(match[1]) : 1;
+    return { color: 'employee-' + index, bgClass: 'employee-bg-' + index };
 }
 
 function createEmployeeProfile(name, id) {
@@ -2133,6 +2169,12 @@ function saveSettings() {
     employees.forEach(function(e, i) {
         const input = document.getElementById('emp' + i);
         if (input) e.name = input.value;
+        const colorInput = document.getElementById('empColor' + i);
+        if (colorInput) {
+            const style = getEmployeeStyleByColor(colorInput.value);
+            e.color = style.color;
+            e.bgClass = style.bgClass;
+        }
     });
     saveOfflineEmployees(employees);
     db.ref('employees').set(employees).catch(function() {});
