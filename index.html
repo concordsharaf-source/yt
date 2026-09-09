@@ -439,6 +439,7 @@ let selectedDay = null;
 let mobileViewDate = new Date();
 let touchStartX = 0, touchEndX = 0, isAnimating = false;
 let unreadChatCount = 0;
+let countedChatKeys = {};
 
 const defaultEmployees = [
     { id: 1, name: 'زكريا', color: 'employee-1', bgClass: 'employee-bg-1', image: 'image/1.jpg' },
@@ -710,11 +711,16 @@ function initConnectionListener() {
 // ===== شارة الدردشة =====
 function updateChatBadge() {
     const badge = document.getElementById('chatBadge');
-    if (unreadChatCount > 0) {
-        badge.textContent = unreadChatCount > 99 ? '99+' : unreadChatCount;
-        badge.classList.remove('hidden');
+    if (!badge) return;
+    const n = Number(unreadChatCount) || 0;
+    if (n > 0) {
+        badge.textContent = n > 99 ? '99+' : String(n);
+        badge.classList.add('is-visible');
+        badge.style.display = 'flex';
     } else {
-        badge.textContent = "0"; badge.classList.add('hidden');
+        badge.textContent = '';
+        badge.classList.remove('is-visible');
+        badge.style.display = 'none';
     }
 }
 
@@ -809,9 +815,6 @@ function attachChatChildAddedListener(username) {
             return;
         }
 
-        // رسالة جديدة فعلاً من شخص آخر (حتى لو وصلت أثناء إغلاق التطبيق)
-        lastKnownChatTimestamp = Math.max(lastKnownChatTimestamp, ts);
-        localStorage.setItem('lastChatTimestamp_' + username, String(lastKnownChatTimestamp));
         unreadChatCount++;
         persistUnreadCount(username);
         updateChatBadge();
@@ -1121,7 +1124,7 @@ function showPage(page) {
         // زر الدردشة يتوقف تظليله عند فتح نافذة الدردشة نفسها
         if (page === 'chat') btn.classList.remove('bg-white/30');
     });
-    if (page === 'chat') document.getElementById('chatBadge').classList.add('hidden');
+    if (page === 'chat') updateChatBadge();
     
     if (page === 'stats') renderStats();
     if (page === 'calendar') {
@@ -1347,7 +1350,7 @@ function renderMobileDayView() {
         cardName.textContent = employee.name;
         document.getElementById('employeeCard').style.display = 'block';
     } else {
-        badge.textContent = 'لا يوجد تعيين';
+        bantent = 'لا يوجد تعيين';
         badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl ' + (isToday ? 'bg-gray-500 text-white' : 'bg-gray-600 text-gray-300');
         document.getElementById('employeeCard').style.display = 'none';
         if (isToday) {
@@ -2309,4 +2312,12 @@ if ('serviceWorker' in navigator) {
 </script>
 
 </body>
+</html>ation.reload();
+        });
+    });
+}
+</script>
+
+</body>
+</html>y>
 </html>
