@@ -1,5 +1,5 @@
 // ===== Service Worker - أوفلاين + إشعارات الخلفية (حتى والتطبيق نايم) =====
-const CACHE_NAME = 'yt-calendar-offline-v7';
+const CACHE_NAME = 'yt-calendar-offline-v8';
 const ICON = './images/icon-192x192.png';
 const APP_URL = './index.html';
 const CHAT_URL = './chat.html';
@@ -51,29 +51,51 @@ self.addEventListener('fetch', function(event) {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  const path = url.pathname.toLowerCase();
+  const isStaticAsset = /\.(png|jpg|jpeg|gif|webp|svg|ttf|woff2?|ico)$/.test(path);
+
+  if (isStaticAsset) {
+    event.respondWith(
+      caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
+        if (cached) return cached;
+        return fetch(event.request).then(function(response) {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, copy); });
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // HTML/JS/CSS: الشبكة أولاً حتى تظهر التحديثات فوراً، والكاش فقط عند انقطاع النت
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
-      const networkRequest = fetch(event.request).then(function(response) {
-        if (response && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, copy);
-          });
-        }
-        return response;
-      }).catch(function() { return cached; });
-      return cached || networkRequest;
-    }).catch(function() {
-      if (event.request.mode === 'navigate') {
-        return caches.match('./index.html', { ignoreSearch: true });
+    fetch(event.request, { cache: 'no-store' }).then(function(response) {
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, copy); });
       }
-      return caches.match(event.request, { ignoreSearch: true });
+      return response;
+    }).catch(function() {
+      return caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
+        if (cached) return cached;
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html', { ignoreSearch: true });
+        }
+        return cached;
+      });
     })
   );
 });
 
 self.addEventListener('message', function(event) {
   const data = event.data || {};
+  if (data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
   if (data.type === 'notify' && data.title) {
     event.waitUntil(showNotification(data.title, data.body, data.tag, data.icon, data.url));
   }
