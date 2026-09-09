@@ -2386,8 +2386,27 @@ function formatSwapDate(value) {
     return d ? d.getDate() + ' ' + arabicMonths[d.getMonth()] + ' ' + d.getFullYear() : value;
 }
 
+function normalizeSwapRequest(request) {
+    const r = request || {};
+    return {
+        requester: r.requester || r.fromUser || r.empAName || '',
+        requesterId: Number(r.requesterId != null ? r.requesterId : r.empAId),
+        requesterDate: r.requesterDate || r.dateA || '',
+        targetEmployee: r.targetEmployee || r.toUser || r.empBName || '',
+        targetEmployeeId: Number(r.targetEmployeeId != null ? r.targetEmployeeId : r.empBId),
+        targetDate: r.targetDate || r.dateB || '',
+        status: r.status || 'pending',
+        createdAt: r.createdAt || 0
+    };
+}
+
+function isValidSwapRequest(request) {
+    const r = normalizeSwapRequest(request);
+    return !!(r.requester && r.targetEmployee && Number.isFinite(r.requesterId) && Number.isFinite(r.targetEmployeeId) && r.requesterDate && r.targetDate);
+}
+
 function pendingSwapRequests() {
-    return Object.keys(swapRequests).filter(function(key) { return swapRequests[key] && swapRequests[key].status === 'pending'; });
+    return Object.keys(swapRequests).filter(function(key) { return isValidSwapRequest(swapRequests[key]) && normalizeSwapRequest(swapRequests[key]).status === 'pending'; });
 }
 
 function updateSwapRequestsBadge() {
@@ -2412,14 +2431,24 @@ function renderSwapRequests() {
         return;
     }
     list.innerHTML = keys.map(function(key) {
-        const r = swapRequests[key];
+        const raw = swapRequests[key];
+        const r = normalizeSwapRequest(raw);
+        const valid = isValidSwapRequest(raw);
         const pending = r.status === 'pending';
         const status = r.status === 'approved' ? 'تمت الموافقة' : (r.status === 'rejected' ? 'مرفوض' : 'بانتظار القرار');
-        return '<div class="border rounded-xl p-3 ' + (pending ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50') + '">' +
+        if (!valid) {
+            return '<div class="border rounded-xl p-3 bg-red-50 border-red-300">' +
+                '<div class="font-bold text-red-700">طلب قديم أو غير مكتمل</div>' +
+                '<div class="text-xs text-gray-500 mt-1">لا يمكن تنفيذ هذا الطلب لأنه يفتقد بيانات التبديل.</div>' +
+                '<button onclick="deleteSwapRequest(\'' + key + '\')" style="background:#dc2626;color:#fff" class="w-full mt-3 py-2 rounded-lg font-bold">حذف الطلب</button>' +
+                '</div>';
+        }
+        return '<div class="border rounded-xl p-3 ' + (pending ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50') + '\">' +
             '<div class="font-bold">' + escapeHtml(r.requester || '') + ' يطلب التبديل مع ' + escapeHtml(r.targetEmployee || '') + '</div>' +
             '<div class="text-sm text-gray-600 mt-1">' + formatSwapDate(r.requesterDate) + ' ⇄ ' + formatSwapDate(r.targetDate) + '</div>' +
-            '<div class="text-xs mt-2 ' + (pending ? 'text-orange-700' : 'text-gray-500') + '">' + status + '</div>' +
-            (pending ? '<div class="flex gap-2 mt-3"><button onclick="approveSwapRequest(\'' + key + '\')" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold">سماح</button><button onclick="rejectSwapRequest(\'' + key + '\')" class="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold">رفض</button></div>' : '') +
+            '<div class="text-xs mt-2 ' + (pending ? 'text-orange-700' : 'text-gray-500') + '\">' + status + '</div>' +
+            (pending ? '<div class="flex gap-2 mt-3"><button onclick="approveSwapRequest(\'' + key + '\')" style="background:#16a34a;color:#fff" class="flex-1 py-2 rounded-lg font-bold">سماح</button><button onclick="rejectSwapRequest(\'' + key + '\')" style="background:#dc2626;color:#fff" class="flex-1 py-2 rounded-lg font-bold">رفض</button></div>' : '') +
+            '<button onclick="deleteSwapRequest(\'' + key + '\')" style="background:#6b7280;color:#fff" class="w-full mt-2 py-2 rounded-lg text-sm font-bold">حذف الطلب</button>' +
             '</div>';
     }).join('');
 }
@@ -2436,7 +2465,8 @@ function closeSwapRequestsModal() {
 
 async function approveSwapRequest(key) {
     if (!currentUser || currentUser.role !== 'admin' || !swapRequests[key]) return;
-    const r = swapRequests[key];
+    const r = normalizeSwapRequest(swapRequests[key]);
+    if (!isValidSwapRequest(swapRequests[key])) return showToast('❌ هذا الطلب قديم أو غير مكتمل؛ احذفه أولًا');
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const first = parseDateInput(r.requesterDate);
     const second = parseDateInput(r.targetDate);
@@ -2462,6 +2492,14 @@ async function rejectSwapRequest(key) {
         await db.ref('swapRequests/' + key).update({ status: 'rejected', decidedAt: Date.now(), decidedBy: currentUser.username });
         showToast('تم رفض طلب التبديل');
     } catch (e) { showToast('❌ تعذر رفض الطلب'); }
+}
+
+async function deleteSwapRequest(key) {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    try {
+        await db.ref('swapRequests/' + key).remove();
+        showToast('تم حذف الطلب');
+    } catch (e) { showToast('❌ تعذر حذف الطلب؛ تحقق من قواعد Firebase'); }
 }
 
 function startSwapRequestListener() {
