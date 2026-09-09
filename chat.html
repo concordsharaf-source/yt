@@ -11,6 +11,7 @@
     <script src="firebase-database.js"></script>
     <script src="firebase-storage.js"></script>
     <script src="config.js"></script>
+    <script src="push.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
@@ -311,6 +312,9 @@ let currentUser = null;
             window.location.href = 'index.html';
         }
     }
+    if (currentUser && window.YTPush) {
+        YTPush.subscribeAndSave(db, currentUser.username).catch(function() {});
+    }
 })();
 
 const userColors = {
@@ -340,9 +344,7 @@ if (SAVED_VERSION < CACHE_VERSION) {
 const messagesArea = document.getElementById('messagesArea');
 const messageInput = document.getElementById('messageInput');
 let replyTo = null, contextMessageKey = null, reactionTargetKey = null;
-const loadedMessages = new Set();
-
-// عرض رسالة واحدة في المنطقة (تعريف مبكر)
+const loaded�الة واحدة في المنطقة (تعريف مبكر)
 function renderMessages() {
     // مسح placeholder القديم إن وجد
     try {
@@ -496,6 +498,17 @@ async function sendMessage() {
     if (replyTo) { msg.replyTo = { key: replyTo.key, sender: replyTo.sender, text: replyTo.text }; cancelReply(); }
     db.ref('chat/general').push(msg);
     messageInput.value = '';
+    try {
+        if (window.YTPush) {
+            const preview = text ? (text.length > 60 ? text.substring(0, 60) + '...' : text) : '📷 صورة';
+            YTPush.notifyAllDevices(db, {
+                title: '💬 رسالة جديدة في الدردشة',
+                body: (currentUser.username || '') + ': ' + preview,
+                tag: 'chat-notification-' + Date.now(),
+                url: './chat.html'
+            }, YTPush.getDeviceId()).catch(function() {});
+        }
+    } catch (e) {}
 }
 
 function handleImageUpload(event) {

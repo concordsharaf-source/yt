@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#1d4ed8">
 <link rel="apple-touch-icon" href="images/icon-192x192.png">
 <script src="config.js"></script>
+<script src="push.js"></script>
 
 <style>
 @import url('fonts.css');
@@ -822,18 +823,35 @@ function notifyNewChatMessage(msg) {
 // الأولوية: إرساله عبر الـ Service Worker (يعمل مع التبويب في الخلفية وأيضاً بعد الإغلاق في بعض الحالات)
 // ثم عبر Notification API المباشر كطريقة احتياطية
 function showPushNotification(title, body, tag) {
-    // حتى لو كانت إشعارات لوحة الهاتف غير مفعّلة، نعرض توست داخل التطبيق لضمان وصول المعلومة
     showToast(title + ' — ' + body);
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const payload = { type: 'notify', title: title, body: body, tag: tag || 'ytcal-notification' };
-    let sentViaSW = false;
-    try {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage(payload);
-            sentViaSW = true;
-        }
-    } catch (e) {}
-    if (sentViaSW) return;
+    const url = (tag && String(tag).indexOf('chat') >= 0) ? './chat.html' : './index.html';
+    if (navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then(function(reg) {
+            return reg.showNotification(title, {
+                body: body,
+                icon: APP_CONFIG.appIconPath,
+                badge: APP_CONFIG.appIconPath,
+                tag: tag || 'ytcal-notification',
+                silent: false,
+                renotify: true,
+                requireInteraction: true,
+                vibrate: [200, 100, 200],
+                data: { url: url }
+            });
+        }).catch(function() {
+            try {
+                new Notification(title, {
+                    body: body,
+                    icon: APP_CONFIG.appIconPath,
+                    tag: tag || 'ytcal-notification',
+                    silent: false,
+                    renotify: true
+                });
+            } catch (e) {}
+        });
+        return;
+    }
     try {
         new Notification(title, {
             body: body,
@@ -842,10 +860,66 @@ function showPushNotification(title, body, tag) {
             tag: tag || 'ytcal-notification',
             silent: false,
             renotify: true,
-            requireInteraction: false,
+            requireInteraction: true,
             vibrate: [200, 100, 200]
         });
-    } catch (e) { /* المتصفح لا يدعم الإشعارات */ }
+    } catch (e) {}
+}
+
+function enableBackgroundPush() {
+    if (!window.YTPush || !currentUser) return;
+    function go() {
+        YTPush.subscribeAndSave(db, currentUser.username).catch(function() {});
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(function(reg) {
+                if (reg.periodicSync && reg.periodicSync.register) {
+                    reg.periodicSync.register('ytcal-keep-alive', { minInterval: 15 * 60 * 1000 }).catch(function() {});
+                }
+            });
+        }
+        scheduleLocalShiftAlarms();
+    }
+    if (Notification.permission === 'granted') go();
+    else if (Notification.permission === 'default') {
+        Notification.requestPermission().then(function(p) { if (p === 'granted') go(); });
+    }
+}
+
+function scheduleLocalShiftAlarms() {
+    if (!currentUser || currentUser.role === 'admin') return;
+    if (typeof TimestampTrigger === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then(function(reg) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        function fireAt(when, title, body, tag) {
+            if (when.getTime() <= Date.now()) return;
+            try {
+                reg.showNotification(title, {
+                    body: body,
+                    icon: APP_CONFIG.appIconPath,
+                    tag: tag,
+                    showTrigger: new TimestampTrigger(when.getTime()),
+                    data: { url: './index.html' },
+                    requireInteraction: true
+                });
+            } catch (e) {}
+        }
+        const todayEmployee = getEmployeeForDate(today);
+        if (todayEmployee && todayEmployee.id === currentUser.id) {
+            const morning = new Date(today);
+            morning.setHours(7, 0, 0, 0);
+            fireAt(morning, '⏰ تذكير بالوردية', 'ورديتك اليوم', 'shift-local-today');
+        }
+        const tomorrowEmployee = getEmployeeForDate(tomorrow);
+        if (tomorrowEmployee && tomorrowEmployee.id === currentUser.id) {
+            const evening = new Date(today);
+            evening.setHours(20, 0, 0, 0);
+            fireAt(evening, '⏰ تذكير بالوردية', 'ورديتك غداً', 'shift-local-tomorrow');
+        }
+    });
 }
 
 // ===== صوت تنبيه الدردشة =====
@@ -980,6 +1054,7 @@ function initApp() {
     });
     
     startListeningForChatNotifications();
+    enableBackgroundPush();
 
     // استرجاع المرجع المحفوظ من آخر جلسة حتى لا تُعدّ الرسائل القديمة كجديدة
     try {
@@ -2058,13 +2133,15 @@ window.addEventListener('load', async function() {
 // طلب إذن الإشعارات بعد أول تفاعل مع الصفحة (متصفحات الجوال ترفض الطلب الفوري دون تفاعل المستخدم)
 let __notifAskedOnce__ = false;
 function requestNotificationPermissionOnce() {
-    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') { enableBackgroundPush(); return; }
+    if (Notification.permission !== 'default') return;
     function ask() {
         if (__notifAskedOnce__ || Notification.permission !== 'default') return;
         __notifAskedOnce__ = true;
         Notification.requestPermission().then(function(perm) {
-            if (perm !== 'granted' && Notification.permission === 'default') {
-                // فشل الطلب الأول: عرض شريط ودود مع زر لتفعيل الإشعارات
+            if (perm === 'granted') enableBackgroundPush();
+            else if (Notification.permission === 'default') {
                 showNotificationRequestBanner();
             }
         });

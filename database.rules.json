@@ -25,6 +25,10 @@
       ".read": false,
       ".write": true
     },
+    "pushSubscriptions": {
+      ".read": true,
+      ".write": true
+    },
     "chat": {
       "general": {
         "$messageId": {
