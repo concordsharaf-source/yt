@@ -36,6 +36,13 @@
           ".validate": "newData.hasChild('sender') && newData.hasChild('timestamp')"
         }
       }
+    },
+    "swapRequests": {
+      ".read": true,
+      "$requestId": {
+        ".write": "root.child('users').child('شرف').child('role').val() === 'admin' || !data.exists()",
+        ".validate": "newData.hasChildren(['requester', 'requesterId', 'requesterDate', 'targetEmployeeId', 'targetDate', 'status', 'createdAt']) && newData.child('status').val() in ['pending', 'approved', 'rejected']"
+      }
     }
   }
 }
