@@ -436,7 +436,7 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
     <div class="modal-overlay absolute inset-0" onclick="closeSwapRequestModal()"></div>
     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-5 w-[min(92vw,420px)] max-h-[90vh] overflow-y-auto">
         <h3 class="text-xl font-bold mb-2">🔄 طلب تبديل وردية</h3>
-        <p class="text-sm text-gray-500 mb-4">اختر ورديتك القادمة ووردية الموظف البديل. لا يمكن طلب تبديل يوم ماضٍ.</p>
+        <p class="text-sm text-gray-500 mb-4">اختر ورديتك اليوم أو وردية قادمة ووردية الموظف البديل. لا يمكن طلب تبديل يوم ماضٍ.</p>
         <label class="block text-sm font-bold mb-1">يوم ورديتك</label>
         <input id="swapMyDate" type="date" class="w-full p-3 border rounded-lg mb-3">
         <p id="swapMyShiftInfo" class="text-xs text-blue-700 mb-3"></p>
@@ -2309,7 +2309,7 @@ function updateSwapDateInfo() {
 function openSwapRequestModal() {
     if (!currentUser || currentUser.role === 'admin') return;
     const modal = document.getElementById('swapRequestModal');
-    const minDate = dateInputValue(tomorrowDate());
+    const minDate = dateInputValue(new Date());
     document.getElementById('swapMyDate').min = minDate;
     document.getElementById('swapTargetDate').min = minDate;
     document.getElementById('swapMyDate').value = minDate;
@@ -2341,7 +2341,7 @@ async function submitSwapRequest() {
     const fail = function(message) { errorEl.textContent = '❌ ' + message; errorEl.classList.remove('hidden'); };
     errorEl.classList.add('hidden');
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    if (!myDate || !targetDate || myDate <= today || targetDate <= today) return fail('يمكن طلب تبديل الأيام القادمة فقط');
+    if (!myDate || !targetDate || myDate < today || targetDate < today) return fail('يمكن طلب تبديل اليوم الحالي أو الأيام القادمة فقط');
     if (myDateValue === targetDateValue) return fail('اختر يومين مختلفين للتبديل');
     if (!targetId || targetId === Number(currentUser.id)) return fail('اختر موظفًا بديلًا مختلفًا');
     const myShift = getEmployeeForDate(myDate);
@@ -2440,7 +2440,7 @@ async function approveSwapRequest(key) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const first = parseDateInput(r.requesterDate);
     const second = parseDateInput(r.targetDate);
-    if (!first || !second || first <= today || second <= today) return showToast('❌ لا يمكن تنفيذ تبديل لأيام ماضية');
+    if (!first || !second || first < today || second < today) return showToast('❌ لا يمكن تنفيذ تبديل لأيام ماضية');
     const firstShift = getEmployeeForDate(first);
     const secondShift = getEmployeeForDate(second);
     if (!firstShift || Number(firstShift.id) !== Number(r.requesterId) || !secondShift || Number(secondShift.id) !== Number(r.targetEmployeeId)) {
