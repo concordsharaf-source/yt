@@ -1286,7 +1286,7 @@ function flashSwipeHint(direction) {
 function animateContentElements() {
     ['dayNumber', 'dayMonth', 'dayName', 'employeeBadge'].forEach(function(id) {
         const el = document.getElementById(id);
-        if (el) { el.style.animation = 'none'; el.offsetHeight; }
+        if (el) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = ''; }
     });
     
     const fridayNote = document.getElementById('nextFridayNote');
@@ -1336,6 +1336,7 @@ function renderMobileDayView() {
         if (isToday) {
             badge.textContent = employee.name;
             badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring ' + employee.color;
+            badge.style.animation = 'pulse-ring 2s infinite';
             badge.style.backgroundColor = getEmployeeColorValue(employee);
             cardContainer.classList.add(employee.bgClass);
             cardContainer.style.background = getEmployeeColorValue(employee);
@@ -1345,6 +1346,7 @@ function renderMobileDayView() {
         } else {
             badge.textContent = employee.name;
             badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl bg-gray-600 text-gray-200';
+            badge.style.animation = '';
             badge.style.backgroundColor = '';
             cardContainer.classList.add('day-card-gray');
             cardContainer.style.background = '';
@@ -1359,6 +1361,7 @@ function renderMobileDayView() {
     } else {
         bantent = 'لا يوجد تعيين';
         badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl ' + (isToday ? 'bg-gray-500 text-white' : 'bg-gray-600 text-gray-300');
+        badge.style.animation = '';
         badge.style.backgroundColor = '';
         cardContainer.style.background = '';
         document.getElementById('employeeCard').style.display = 'none';
