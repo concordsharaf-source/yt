@@ -318,12 +318,12 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
             <h3 id="statsYearTitle" class="text-base sm:text-lg font-bold text-center flex-1">إحصائية العام</h3>
             <button type="button" onclick="nextStatsYear()" class="bg-white text-blue-700 font-bold px-3 py-2 rounded-lg text-sm">سنة ▶</button>
         </div>
+        <h3 id="currentMonthTitle" class="text-lg font-bold mb-3 text-gray-800">الشهر الحالي</h3>
+        <div id="statsContainer" class="space-y-4 mb-6"></div>
         <p id="statsMonth" class="text-gray-600 mb-4 font-bold"></p>
         <div id="statsYearContainer" class="space-y-3 mb-6"></div>
         <h3 class="text-lg font-bold mb-3 text-gray-800">📅 تفصيل الأشهر</h3>
         <div id="statsMonthsTable" class="overflow-x-auto mb-6"></div>
-        <h3 class="text-lg font-bold mb-3 text-gray-800">الشهر الحالي</h3>
-        <div id="statsContainer" class="space-y-4"></div>
     </div>
 </div>
 
@@ -1621,6 +1621,8 @@ function renderStats() {
 
     const monthCounts = countShiftsInRange(new Date(year, month, 1), new Date(year, month + 1, 0));
     renderEmployeeCountCards('statsContainer', monthCounts);
+    const currentMonthTitle = document.getElementById('currentMonthTitle');
+    if (currentMonthTitle) currentMonthTitle.textContent = 'الشهر الحالي — ' + arabicMonths[month] + ' ' + year;
 
     const table = document.getElementById('statsMonthsTable');
     if (table) {
