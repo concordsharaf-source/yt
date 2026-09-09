@@ -282,12 +282,30 @@
         }
         .image-overlay img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
 
-        .swipe-hint {
-            position: absolute; top: 50%; transform: translateY(-50%);
-            color: #8696a0; font-size: 1.1rem; opacity: 0; pointer-events: none;
+        .message-row.swiping {
+            transition: none;
         }
-        .received .swipe-hint { right: -22px; }
-        .sent .swipe-hint { left: -22px; }
+        .swipe-hint {
+            position: absolute;
+            top: 50%;
+            width: 32px; height: 32px;
+            margin-top: -16px;
+            border-radius: 50%;
+            background: #00a884;
+            color: #fff;
+            font-size: 1rem;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0;
+            transform: scale(0.4);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .received .swipe-hint { left: -6px; }
+        .sent .swipe-hint { right: -6px; }
+        .swipe-hint.show {
+            opacity: 1;
+            transform: scale(1);
+        }
     </style>
 </head>
 <body>
@@ -776,20 +794,58 @@ function appendMessage(key, msg) {
     if (reactionsRow.childNodes.length) content.appendChild(reactionsRow);
 
     bubble.addEventListener('contextmenu', function(e) { e.preventDefault(); showContextMenu(e, key, msg); });
-    let holdTimer;
-    bubble.addEventListener('touchstart', function() {
-        holdTimer = setTimeout(function() { showReactionPicker({ pageX: 80, pageY: 200 }, key); }, 450);
-    }, { passive: true });
-    bubble.addEventListener('touchend', function() { clearTimeout(holdTimer); });
-    bubble.addEventListener('touchmove', function() { clearTimeout(holdTimer); });
     bubble.addEventListener('dblclick', function() { startReply(key, msg); });
 
-    let startX = 0;
-    bubble.addEventListener('touchstart', function(e) { startX = e.changedTouches[0].screenX; }, { passive: true });
-    bubble.addEventListener('touchend', function(e) {
-        const dx = e.changedTouches[0].screenX - startX;
-        if (Math.abs(dx) > 56) startReply(key, msg);
+    let holdTimer = null;
+    let startX = 0, dragging = false, lastDx = 0;
+    const MAX_SWIPE = 72;
+    function swipeOffset(dx) {
+        if (isSent) return Math.max(-MAX_SWIPE, Math.min(0, dx));
+        return Math.max(0, Math.min(MAX_SWIPE, dx));
+    }
+    row.addEventListener('touchstart', function(e) {
+        startX = e.changedTouches[0].screenX;
+        dragging = false;
+        lastDx = 0;
+        row.classList.add('swiping');
+        holdTimer = setTimeout(function() {
+            if (!dragging) {
+                const rect = bubble.getBoundingClientRect();
+                showReactionPicker({ pageX: rect.left + rect.width / 2, pageY: rect.top }, key);
+            }
+        }, 450);
     }, { passive: true });
+    row.addEventListener('touchmove', function(e) {
+        const dx = e.changedTouches[0].screenX - startX;
+        if (Math.abs(dx) > 8) {
+            dragging = true;
+            clearTimeout(holdTimer);
+        }
+        if (!dragging) return;
+        lastDx = swipeOffset(dx);
+        row.style.transform = 'translateX(' + lastDx + 'px)';
+        const progress = Math.min(1, Math.abs(lastDx) / 48);
+        hint.style.opacity = String(progress);
+        hint.style.transform = 'scale(' + (0.4 + 0.6 * progress) + ')';
+        if (progress > 0.85) hint.classList.add('show');
+        else hint.classList.remove('show');
+    }, { passive: true });
+    function endSwipe() {
+        clearTimeout(holdTimer);
+        row.classList.remove('swiping');
+        row.style.transition = 'transform 0.2s ease';
+        const shouldReply = Math.abs(lastDx) > 48;
+        row.style.transform = 'translateX(0)';
+        hint.style.opacity = '0';
+        hint.style.transform = 'scale(0.4)';
+        hint.classList.remove('show');
+        setTimeout(function() { row.style.transition = ''; }, 220);
+        if (shouldReply) startReply(key, msg);
+        dragging = false;
+        lastDx = 0;
+    }
+    row.addEventListener('touchend', endSwipe);
+    row.addEventListener('touchcancel', endSwipe);
 
     row.appendChild(avatar);
     row.appendChild(content);
