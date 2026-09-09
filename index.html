@@ -1326,14 +1326,18 @@ function renderMobileDayView() {
         if (isToday) {
             badge.textContent = employee.name;
             badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl pulse-ring ' + employee.color;
+            badge.style.backgroundColor = getEmployeeColorValue(employee);
             cardContainer.classList.add(employee.bgClass);
+            cardContainer.style.background = getEmployeeColorValue(employee);
             document.getElementById('dayNumber').classList.add('text-white');
             document.getElementById('dayMonth').classList.add('text-white/90');
             document.getElementById('dayName').classList.add('text-white/80');
         } else {
             badge.textContent = employee.name;
             badge.className = 'inline-block px-10 py-5 rounded-3xl text-4xl font-extrabold shadow-2xl bg-gray-600 text-gray-200';
+            badge.style.backgroundColor = '';
             cardContainer.classList.add('day-card-gray');
+            cardContainer.style.background = '';
             document.getElementById('dayNumber').classList.add('day-number-gray');
             document.getElementById('dayMonth').classList.add('day-month-gray');
             document.getElementById('dayName').classList.add('day-name-gray');
@@ -1345,6 +1349,8 @@ function renderMobileDayView() {
     } else {
         bantent = 'لا يوجد تعيين';
         badge.className = 'inline-block px-10 py-5 rounded-3xl text-3xl font-bold shadow-2xl ' + (isToday ? 'bg-gray-500 text-white' : 'bg-gray-600 text-gray-300');
+        badge.style.backgroundColor = '';
+        cardContainer.style.background = '';
         document.getElementById('employeeCard').style.display = 'none';
         if (isToday) {
             document.getElementById('dayNumber').classList.add('text-white');
@@ -1417,6 +1423,7 @@ function renderCalendar() {
         const emp = employees.find(function(e) { return e.id === shifts[key]; });
         const cell = document.createElement('div');
         cell.className = `min-h-[90px] p-2 ${emp ? emp.color : 'bg-white'} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
+        if (emp) cell.style.backgroundColor = getEmployeeColorValue(emp);
         if (currentUser && currentUser.role === 'admin') cell.onclick = function() { openModal(day); };
         
         const number = document.createElement('div');
@@ -1458,6 +1465,7 @@ function renderLandscapeCalendar() {
         const emp = employees.find(function(e) { return e.id === shifts[key]; });
         const cell = document.createElement('div');
         cell.className = `min-h-[60px] p-1 ${emp ? emp.color : 'bg-white'} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
+        if (emp) cell.style.backgroundColor = getEmployeeColorValue(emp);
         if (currentUser && currentUser.role === 'admin') cell.onclick = function() { openModal(day); };
         
         const number = document.createElement('div');
@@ -1477,7 +1485,7 @@ function renderLandscapeCalendar() {
 
 function renderLegend() {
     const container = document.getElementById('legendContainer');
-    if (container) container.innerHTML = employees.map(function(e) { return `<div class="flex items-center gap-2"><div class="w-4 h-4 rounded ${e.color}"></div><span>${e.name}</span></div>`; }).join('');
+    if (container) container.innerHTML = employees.map(function(e) { return `<div class="flex items-center gap-2"><div class="w-4 h-4 rounded ${e.color}" style="background-color:${getEmployeeColorValue(e)}"></div><span>${e.name}</span></div>`; }).join('');
 }
 
 function previousMonth() {
@@ -1497,7 +1505,7 @@ function openModal(day) {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     document.getElementById('selectedDateText').textContent = `${day} ${arabicMonths[month]} ${year}`;
-    document.getElementById('employeeOptions').innerHTML = employees.map(function(e) { return `<button onclick="assignEmployee(${e.id})" class="w-full p-3 rounded-lg ${e.color}">${e.name}</button>`; }).join('');
+    document.getElementById('employeeOptions').innerHTML = employees.map(function(e) { return `<button onclick="assignEmployee(${e.id})" class="w-full p-3 rounded-lg ${e.color}" style="background-color:${getEmployeeColorValue(e)}">${e.name}</button>`; }).join('');
     document.getElementById('employeeModal').classList.remove('hidden');
 }
 
@@ -1575,7 +1583,7 @@ function renderEmployeeCountCards(containerId, counts) {
     el.innerHTML = list.map(function(e) {
         const n = counts[e.id] || 0;
         const pct = total ? Math.round((n / total) * 100) : 0;
-        return `<div class="p-4 rounded-lg ${e.color} text-white">
+        return `<div class="p-4 rounded-lg ${e.color} text-white" style="background-color:${getEmployeeColorValue(e)}">
             <div class="flex justify-between items-center">
                 <span class="font-bold text-lg">${e.name}</span>
                 <span class="text-2xl font-bold">${n} وردية</span>
@@ -1672,14 +1680,15 @@ function nextStatsYear() {
 function renderSettings() {
     if (!isSuperAdmin() || !document.getElementById('settingsContainer')) return;
     document.getElementById('settingsContainer').innerHTML = employees.map(function(e, i) {
-        const colorOptions = getEmployeeColorOptions(e.color);
+        const colorValue = e.colorHex || getEmployeeColorHex(e.color);
         return `<div>
             <label class="text-sm text-gray-500">الموظف ${i+1}</label>
             <div class="flex items-center gap-2 mt-1">
                 <input id="emp${i}" value="${escapeHtml(e.name)}" class="flex-1 min-w-0 p-3 border rounded-lg">
-                <select id="empColor${i}" class="w-32 p-3 border rounded-lg bg-white" title="لون الموظف">
-                    ${colorOptions}
-                </select>
+                <label class="flex items-center gap-2 border rounded-lg bg-white px-2 py-1 cursor-pointer" title="اختيار لون الموظف">
+                    <span id="empColorPreview${i}" class="w-8 h-8 rounded-lg border shadow-inner ${e.color || 'employee-1'}" style="background-color:${colorValue}"></span>
+                    <input id="empColor${i}" type="color" value="${colorValue}" class="w-10 h-10 p-0 border-0 rounded cursor-pointer" oninput="this.previousElementSibling.style.backgroundColor=this.value">
+                </label>
             </div>
         </div>`;
     }).join('');
@@ -1973,6 +1982,22 @@ function getEmployeeColorOptions(selected) {
     }).join('');
 }
 
+function getEmployeeColorHex(color) {
+    const colors = {
+        'employee-1': '#22c55e', 'employee-2': '#f59e0b',
+        'employee-3': '#3b82f6', 'employee-4': '#ef4444',
+        'employee-5': '#8b5cf6', 'employee-6': '#ec4899',
+        'employee-7': '#06b6d4', 'employee-8': '#64748b'
+    };
+    return colors[color] || '#22c55e';
+}
+
+function getEmployeeColorValue(employee) {
+    return employee && /^#[0-9a-fA-F]{6}$/.test(employee.colorHex || '')
+        ? employee.colorHex
+        : getEmployeeColorHex(employee && employee.color);
+}
+
 function getEmployeeStyleByColor(color) {
     const match = /^employee-([1-8])$/.exec(String(color || ''));
     const index = match ? Number(match[1]) : 1;
@@ -2171,9 +2196,7 @@ function saveSettings() {
         if (input) e.name = input.value;
         const colorInput = document.getElementById('empColor' + i);
         if (colorInput) {
-            const style = getEmployeeStyleByColor(colorInput.value);
-            e.color = style.color;
-            e.bgClass = style.bgClass;
+            e.colorHex = colorInput.value;
         }
     });
     saveOfflineEmployees(employees);
