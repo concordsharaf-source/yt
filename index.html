@@ -1543,24 +1543,87 @@ function clearAssignment() {
 }
 
 // ===== الإحصائيات =====
+function countShiftsInRange(startDate, endDate) {
+    const counts = {};
+    employees.forEach(function(e) { counts[e.id] = 0; });
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const last = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    while (cursor <= last) {
+        const emp = getEmployeeForDate(cursor);
+        if (emp && counts[emp.id] !== undefined) counts[emp.id]++;
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return counts;
+}
+
+function renderEmployeeCountCards(containerId, counts) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const list = employees.filter(function(e) { return !e.disabled; });
+    const total = list.reduce(function(sum, e) { return sum + (counts[e.id] || 0); }, 0);
+    el.innerHTML = list.map(function(e) {
+        const n = counts[e.id] || 0;
+        const pct = total ? Math.round((n / total) * 100) : 0;
+        return `<div class="p-4 rounded-lg ${e.color} text-white">
+            <div class="flex justify-between items-center">
+                <span class="font-bold text-lg">${e.name}</span>
+                <span class="text-2xl font-bold">${n} وردية</span>
+            </div>
+            <div class="mt-2 h-2 bg-white/30 rounded-full overflow-hidden">
+                <div class="h-full bg-white/90" style="width:${pct}%"></div>
+            </div>
+            <div class="text-xs mt-1 text-white/80">${pct}% من ورديات الفترة</div>
+        </div>`;
+    }).join('') + (total ? `<p class="text-center text-gray-500 text-sm">المجموع: ${total} وردية</p>` : '');
+}
+
 function renderStats() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    document.getElementById('statsMonth').textContent = `إحصائيات شهر ${arabicMonths[month]} ${year}`;
-    
-    let counts = {};
-    employees.forEach(function(e) { counts[e.id] = 0; });
-    const prefix = `${year}-${month+1}-`;
-    Object.entries(shifts).forEach(function([key, id]) {
-        if (key.startsWith(prefix) && counts[id] !== undefined) counts[id]++;
-    });
-    
-    document.getElementById('statsContainer').innerHTML = employees.map(function(e) {
-        return `<div class="p-4 rounded-lg ${e.color} text-white flex justify-between items-center">
-            <span class="font-bold text-lg">${e.name}</span>
-            <span class="text-2xl font-bold">${counts[e.id]} وردية</span>
-        </div>`;
-    }).join('');
+    const yearTitle = document.getElementById('statsYearTitle');
+    if (yearTitle) yearTitle.textContent = 'إحصائية عام ' + year;
+    document.getElementById('statsMonth').textContent = 'إجمالي الورديات من 1 يناير حتى 31 ديسمبر ' + year;
+
+    const yearCounts = countShiftsInRange(new Date(year, 0, 1), new Date(year, 11, 31));
+    renderEmployeeCountCards('statsYearContainer', yearCounts);
+
+    const monthCounts = countShiftsInRange(new Date(year, month, 1), new Date(year, month + 1, 0));
+    renderEmployeeCountCards('statsContainer', monthCounts);
+
+    const table = document.getElementById('statsMonthsTable');
+    if (table) {
+        const active = employees.filter(function(e) { return !e.disabled; });
+        let html = '<table class="w-full text-sm border-collapse min-w-[520px]"><thead><tr class="bg-gray-800 text-white">';
+        html += '<th class="p-2 text-right">الشهر</th>';
+        active.forEach(function(e) { html += '<th class="p-2">' + e.name + '</th>'; });
+        html += '</tr></thead><tbody>';
+        for (let m = 0; m < 12; m++) {
+            const mc = countShiftsInRange(new Date(year, m, 1), new Date(year, m + 1, 0));
+            const isCurrent = m === month;
+            html += '<tr class="' + (isCurrent ? 'bg-blue-50 font-bold' : (m % 2 ? 'bg-gray-50' : 'bg-white')) + '">';
+            html += '<td class="p-2 border-b">' + arabicMonths[m] + '</td>';
+            active.forEach(function(e) {
+                html += '<td class="p-2 border-b text-center">' + (mc[e.id] || 0) + '</td>';
+            });
+            html += '</tr>';
+        }
+        html += '<tr class="bg-gray-200 font-bold"><td class="p-2">المجموع السنوي</td>';
+        active.forEach(function(e) {
+            html += '<td class="p-2 text-center">' + (yearCounts[e.id] || 0) + '</td>';
+        });
+        html += '</tr></tbody></table>';
+        table.innerHTML = html;
+    }
+}
+
+function previousStatsYear() {
+    currentDate.setFullYear(currentDate.getFullYear() - 1);
+    renderStats();
+}
+
+function nextStatsYear() {
+    currentDate.setFullYear(currentDate.getFullYear() + 1);
+    renderStats();
 }
 
 // ===== الإعدادات =====
