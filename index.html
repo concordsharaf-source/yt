@@ -977,7 +977,6 @@ function getDeviceId() {
 // ===== فتح الدردشة =====
 function openChatPage() {
     if (!currentUser) return;
-    // صفحة الدردشة تتحقق من رمز الجلسة المخزنة في Firebase (db.ref('sessions'))
     unreadChatCount = 0;
     lastKnownChatTimestamp = Date.now();
     countedChatKeys = {};
@@ -985,21 +984,7 @@ function openChatPage() {
     localStorage.setItem('lastChatTimestamp_' + currentUser.username, String(lastKnownChatTimestamp));
     updateChatBadge();
     localStorage.setItem('chatWindowOpen', 'true');
-    // تظليل زر الدردشة أثناء فتحها
-    document.querySelectorAll('.nav-btn').forEach(function(btn) {
-        btn.classList.toggle('bg-white/30', btn.dataset.page === 'chat');
-    });
-    const chatWindow = window.open('chat.html?v=2', '_blank');
-    const checkWindow = setInterval(function() {
-        if (chatWindow.closed) {
-            localStorage.removeItem('chatWindowOpen');
-            clearInterval(checkWindow);
-            // إزالة تظليل زر الدردشة عند إغلاقها
-            document.querySelectorAll('.nav-btn').forEach(function(btn) {
-                btn.classList.toggle('bg-white/30', btn.dataset.page === 'calendar');
-            });
-        }
-    }, 500);
+    window.location.href = 'chat.html';
 }
 
 // ===== تهيئة التطبيق =====
