@@ -25,6 +25,16 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 .employee-7 { background-color:#06b6d4; color:white; }
 .employee-8 { background-color:#64748b; color:white; }
 .today-highlight { box-shadow: inset 0 0 0 4px #000000; }
+.calendar-shine { position: relative; overflow: hidden; }
+.calendar-shine::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(115deg, rgba(255,255,255,.28) 0%, rgba(255,255,255,.08) 38%, transparent 68%);
+}
+.calendar-shine > * { position: relative; z-index: 1; }
 .modal-overlay { background-color:rgba(0,0,0,.5); backdrop-filter:blur(4px); }
 .mobile-day-view { display: none; min-height: 100vh; overflow-x: hidden; }
 .desktop-calendar { display: block; }
@@ -1422,7 +1432,7 @@ function renderCalendar() {
         const key = `${year}-${month+1}-${day}`;
         const emp = employees.find(function(e) { return e.id === shifts[key]; });
         const cell = document.createElement('div');
-        cell.className = `min-h-[90px] p-2 ${emp ? emp.color : 'bg-white'} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
+        cell.className = `min-h-[90px] p-2 ${emp ? emp.color : 'bg-white'} ${emp ? 'calendar-shine' : ''} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
         if (emp) cell.style.backgroundColor = getEmployeeColorValue(emp);
         if (currentUser && currentUser.role === 'admin') cell.onclick = function() { openModal(day); };
         
@@ -1464,7 +1474,7 @@ function renderLandscapeCalendar() {
         const key = `${year}-${month+1}-${day}`;
         const emp = employees.find(function(e) { return e.id === shifts[key]; });
         const cell = document.createElement('div');
-        cell.className = `min-h-[60px] p-1 ${emp ? emp.color : 'bg-white'} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
+        cell.className = `min-h-[60px] p-1 ${emp ? emp.color : 'bg-white'} ${emp ? 'calendar-shine' : ''} ${isCurrentMonth && day === today.getDate() ? 'today-highlight' : ''} ${currentUser && currentUser.role === 'admin' ? 'cursor-pointer' : ''}`;
         if (emp) cell.style.backgroundColor = getEmployeeColorValue(emp);
         if (currentUser && currentUser.role === 'admin') cell.onclick = function() { openModal(day); };
         
