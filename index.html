@@ -307,9 +307,18 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 
 <!-- صفحة الإحصائيات -->
 <div id="statsPage" class="page hidden container mx-auto px-4 py-6">
-    <div class="bg-white rounded-xl shadow-md p-6">
-        <h2 class="text-2xl font-bold mb-6">📊 إحصائيات الورديات</h2>
-        <p id="statsMonth"></p>
+    <div class="bg-white rounded-xl shadow-md p-4 sm:p-6">
+        <h2 class="text-2xl font-bold mb-4">📊 إحصائيات الورديات</h2>
+        <div class="flex items-center justify-between gap-2 mb-4 bg-blue-600 text-white rounded-xl p-3">
+            <button type="button" onclick="previousStatsYear()" class="bg-white text-blue-700 font-bold px-3 py-2 rounded-lg text-sm">◀ سنة</button>
+            <h3 id="statsYearTitle" class="text-base sm:text-lg font-bold text-center flex-1">إحصائية العام</h3>
+            <button type="button" onclick="nextStatsYear()" class="bg-white text-blue-700 font-bold px-3 py-2 rounded-lg text-sm">سنة ▶</button>
+        </div>
+        <p id="statsMonth" class="text-gray-600 mb-4 font-bold"></p>
+        <div id="statsYearContainer" class="space-y-3 mb-6"></div>
+        <h3 class="text-lg font-bold mb-3 text-gray-800">📅 تفصيل الأشهر</h3>
+        <div id="statsMonthsTable" class="overflow-x-auto mb-6"></div>
+        <h3 class="text-lg font-bold mb-3 text-gray-800">الشهر الحالي</h3>
         <div id="statsContainer" class="space-y-4"></div>
     </div>
 </div>
@@ -1580,9 +1589,38 @@ function renderEmployeeCountCards(containerId, counts) {
 function renderStats() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
+    const page = document.getElementById('statsPage');
+    if (page && !document.getElementById('statsYearTitle')) {
+        const box = page.querySelector('.bg-white') || page;
+        const bar = document.createElement('div');
+        bar.className = 'flex items-center justify-between gap-2 mb-4 bg-blue-600 text-white rounded-xl p-3';
+        bar.innerHTML = '<button type="button" onclick="previousStatsYear()" class="bg-white text-blue-700 font-bold px-3 py-2 rounded-lg text-sm">◀ سنة</button>' +
+            '<h3 id="statsYearTitle" class="text-base font-bold text-center flex-1"></h3>' +
+            '<button type="button" onclick="nextStatsYear()" class="bg-white text-blue-700 font-bold px-3 py-2 rounded-lg text-sm">سنة ▶</button>';
+        const heading = box.querySelector('h2');
+        if (heading && heading.nextSibling) box.insertBefore(bar, heading.nextSibling);
+        else box.insertBefore(bar, box.firstChild);
+        if (!document.getElementById('statsYearContainer')) {
+            const yc = document.createElement('div');
+            yc.id = 'statsYearContainer';
+            yc.className = 'space-y-3 mb-6';
+            const monthEl = document.getElementById('statsMonth');
+            if (monthEl) monthEl.after(yc);
+            else box.appendChild(yc);
+        }
+        if (!document.getElementById('statsMonthsTable')) {
+            const t = document.createElement('div');
+            t.id = 'statsMonthsTable';
+            t.className = 'overflow-x-auto mb-6';
+            const yc2 = document.getElementById('statsYearContainer');
+            if (yc2) yc2.after(t);
+            else box.appendChild(t);
+        }
+    }
     const yearTitle = document.getElementById('statsYearTitle');
-    if (yearTitle) yearTitle.textContent = 'إحصائية عام ' + year;
-    document.getElementById('statsMonth').textContent = 'إجمالي الورديات من 1 يناير حتى 31 ديسمبر ' + year;
+    if (yearTitle) yearTitle.textContent = 'عام ' + year;
+    const monthLabel = document.getElementById('statsMonth');
+    if (monthLabel) monthLabel.textContent = 'إجمالي السنة كاملة + تفصيل الأشهر — ' + year;
 
     const yearCounts = countShiftsInRange(new Date(year, 0, 1), new Date(year, 11, 31));
     renderEmployeeCountCards('statsYearContainer', yearCounts);
