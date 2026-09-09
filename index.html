@@ -174,14 +174,18 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
     background-color: #ef4444;
     color: white;
     border-radius: 50%;
-    width: 18px;
+    min-width: 18px;
     height: 18px;
+    padding: 0 4px;
     font-size: 0.65rem;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     font-weight: bold;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.chat-badge.is-visible {
+    display: flex !important;
 }
 </style>
 </head>
@@ -224,7 +228,7 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
         <button onclick="showPage('stats')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="stats" title="الإحصائيات">📊</button>
         <button onclick="openChatPage()" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg relative" data-page="chat" title="الدردشة">
             💬
-            <span id="chatBadge" class="chat-badge hidden">0</span>
+            <span id="chatBadge" class="chat-badge"></span>
         </button>
         <button onclick="showPage('settings')" class="nav-btn p-2 rounded-lg hover:bg-white/20 text-lg" data-page="settings" title="الإعدادات">⚙️</button>
     </div>
@@ -973,7 +977,9 @@ function openChatPage() {
     // صفحة الدردشة تتحقق من رمز الجلسة المخزنة في Firebase (db.ref('sessions'))
     unreadChatCount = 0;
     lastKnownChatTimestamp = Date.now();
+    countedChatKeys = {};
     persistUnreadCount(currentUser.username);
+    localStorage.setItem('lastChatTimestamp_' + currentUser.username, String(lastKnownChatTimestamp));
     updateChatBadge();
     localStorage.setItem('chatWindowOpen', 'true');
     // تظليل زر الدردشة أثناء فتحها
