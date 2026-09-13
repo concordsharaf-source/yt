@@ -1,0 +1,5 @@
+project_id = "pyjjaekcqbdijcyloqvx"
+
+[functions.send-push]
+# يستدعيها التطبيق بمفتاح x-app-key (لا يملك مستخدمو التطبيق JWT من Supabase)
+verify_jwt = false

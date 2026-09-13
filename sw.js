@@ -1,5 +1,10 @@
 // ===== Service Worker - أوفلاين + إشعارات الخلفية (حتى والتطبيق نايم) =====
-const CACHE_NAME = 'yt-calendar-offline-v8';
+const CACHE_NAME = 'yt-calendar-offline-v9';
+
+// إعدادات Push من ملف الإعدادات المشترك (نفس مفتاح VAPID العام + رابط الدالة)
+try { importScripts('./config.js'); } catch (e) { /* سيعمل بثوابت احتياطية */ }
+const PUSH_CFG = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.supabasePush) ? APP_CONFIG.supabasePush : null;
+const FALLBACK_VAPID_PUBLIC = 'BDWpEgXrrowDqNe2tHNGIdNmEI2hjNCK8GxQXQhUfpIPievRwMgJhq-ZUbUpeOcrRHrOofp6OSmBwVMSXGsxIZQ';
 const ICON = './images/icon-192x192.png';
 const APP_URL = './index.html';
 const CHAT_URL = './chat.html';
@@ -125,10 +130,30 @@ self.addEventListener('periodicsync', function(event) {
 });
 
 self.addEventListener('pushsubscriptionchange', function(event) {
-  event.waitUntil(self.registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array('BCwq5BUWwBl8-WURfqPPKXDMaYX3yh8uoDa9867xRMlK6XR5QnV6rc4HI1JhQVIAQADkSs9L6Xk7IKungVfH0qo')
-  }));
+  event.waitUntil((async function() {
+    const vapid = (PUSH_CFG && PUSH_CFG.vapidPublicKey) || FALLBACK_VAPID_PUBLIC;
+    // المتصفحات الحديثة تعطي الاشتراك الجديد جاهزاً، وإلا ننشئه
+    const newSub = event.newSubscription || await self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapid)
+    });
+    // سجّل الاشتراك الجديد في Supabase (هوية المستخدم تُربط عند فتح التطبيق)
+    if (PUSH_CFG && PUSH_CFG.functionUrl && newSub) {
+      const json = newSub.toJSON();
+      try {
+        await fetch(PUSH_CFG.functionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-app-key': PUSH_CFG.appKey || '' },
+          body: JSON.stringify({
+            action: 'register',
+            app_user: null,
+            device_id: null,
+            subscription: { endpoint: json.endpoint, keys: json.keys }
+          })
+        });
+      } catch (e) { /* سيعاد التسجيل من الصفحة عند فتح التطبيق */ }
+    }
+  })());
 });
 
 self.addEventListener('notificationclick', function(event) {

@@ -25,7 +25,16 @@ const APP_CONFIG = {
   },
 
   imageInputPath: 'images/',   // مسار مجلد الصور
-  appIconPath: 'images/icon-192x192.png'
+  appIconPath: 'images/icon-192x192.png',
+
+  // ===== إشعارات Push عبر Supabase Edge Function =====
+  // المفتاح الخاص VAPID موجود فقط داخل أسرار الدالة على Supabase (ليس هنا).
+  // appKey مفتاح عام للعميل يمنع الاستدعاء العشوائي؛ هو ليس سراً قوياً لأنه في كود الواجهة.
+  supabasePush: {
+    functionUrl: 'https://pyjjaekcqbdijcyloqvx.supabase.co/functions/v1/send-push',
+    appKey: 'nXwGBUpmnw1fFr-r0sfYrgJU5RaFA1bc',
+    vapidPublicKey: 'BDWpEgXrrowDqNe2tHNGIdNmEI2hjNCK8GxQXQhUfpIPievRwMgJhq-ZUbUpeOcrRHrOofp6OSmBwVMSXGsxIZQ'
+  }
 };
 
 // ===== دالة مساعدة لحساب Hash كلمة المرور (تُستخدم عند تغييرها) =====
