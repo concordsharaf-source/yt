@@ -1,5 +1,5 @@
 // ===== Service Worker - أوفلاين + إشعارات الخلفية (حتى والتطبيق نايم) =====
-const CACHE_NAME = 'yt-calendar-offline-v9';
+const CACHE_NAME = 'yt-calendar-offline-v10';
 
 // إعدادات Push من ملف الإعدادات المشترك (نفس مفتاح VAPID العام + رابط الدالة)
 try { importScripts('./config.js'); } catch (e) { /* سيعمل بثوابت احتياطية */ }

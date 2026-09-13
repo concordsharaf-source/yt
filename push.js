@@ -2,10 +2,13 @@
 // الاشتراك يُحفظ في Supabase، والإرسال يتم من الخادم (المفتاح الخاص VAPID هناك فقط).
 // الواجهة العامة تبقى كما هي: subscribeAndSave / notifyUser / notifyAllDevices / getDeviceId
 (function (root) {
-  const CFG = (root.APP_CONFIG && APP_CONFIG.supabasePush) || {};
+  // مهم: config.js يعرّف "const APP_CONFIG" — يظهر كمعرّف عام مجرّد لكنه ليس خاصية على window.
+  // لذلك نقرنه بالاسم المجرّد عبر فحص النوع، ولا نستخدم window.APP_CONFIG.
+  const CFG = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.supabasePush) || {};
   const FUNCTION_URL = CFG.functionUrl || 'https://pyjjaekcqbdijcyloqvx.supabase.co/functions/v1/send-push';
   const APP_KEY = CFG.appKey || '';
   const VAPID_PUBLIC = CFG.vapidPublicKey || '';
+  const VAPID_STORAGE_KEY = 'yt_vapid_public';
 
   function b64urlToBytes(s) {
     s = s.replace(/-/g, '+').replace(/_/g, '/');
@@ -58,14 +61,22 @@
   async function subscribeAndSave(db, username) {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
     if (!('Notification' in window)) return null;
+    if (!VAPID_PUBLIC || !APP_KEY) {
+      console.warn('YTPush: إعدادات Supabase غير متوفرة في APP_CONFIG.supabasePush');
+      return null;
+    }
     if (Notification.permission !== 'granted') {
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') return null;
     }
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
-    if (sub && !(await subscriptionMatchesKey(sub))) {
-      // مفتاح VAPID تغيّر → اشتراك جديد
+
+    // ترحيل موثوق عبر كل المتصفحات: إذا تغيّر مفتاح VAPID (أو أول مرة بعد الترقية)
+    // نلغي الاشتراك القديم وننشئ واحداً جديداً مطابقاً للمفتاح الحالي.
+    const storedVapid = localStorage.getItem(VAPID_STORAGE_KEY);
+    const keyChanged = storedVapid !== VAPID_PUBLIC;
+    if (sub && (keyChanged || !(await subscriptionMatchesKey(sub)))) {
       await sub.unsubscribe().catch(function () {});
       sub = null;
     }
@@ -79,6 +90,7 @@
     const deviceId = getDeviceId();
 
     // المصدر الأساسي: Supabase عبر الدالة
+    let registered = false;
     try {
       await callFunction({
         action: 'register',
@@ -90,8 +102,12 @@
           expirationTime: json.expirationTime || null
         }
       });
+      registered = true;
+      // تأكيد أن هذا الجهاز مربوط بمفتاح VAPID الحالي (يمنع إعادة الاشتراك كل مرة)
+      localStorage.setItem(VAPID_STORAGE_KEY, VAPID_PUBLIC);
     } catch (e) {
-      // احتياط: احفظ في Firebase عند تعذر الوصول لـ Supabase
+      console.warn('YTPush: تعذر التسجيل في Supabase:', e);
+      // احتياط: احفظ في Firebase عند تعذر الوصول لـ Supabase فقط
       if (db && username) {
         db.ref('pushSubscriptions/' + username + '/' + deviceId).set({
           endpoint: json.endpoint,
@@ -101,6 +117,7 @@
         }).catch(function () {});
       }
     }
+    json.registered = registered;
     return json;
   }
 
