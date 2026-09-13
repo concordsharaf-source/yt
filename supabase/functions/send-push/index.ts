@@ -82,6 +82,15 @@ async function handleRegister(admin: SupabaseClient, p: any) {
   if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
     return jsonResponse({ error: "subscription.endpoint and keys are required" }, 400);
   }
+  // منع التكرار: جهاز واحد (device_id) = صف واحد. احذف أي اشتراك قديم لنفس الجهاز
+  // بنقطة نهاية مختلفة (يحدث عند ترقية مفتاح VAPID أو سباق بين الصفحات).
+  if (deviceId) {
+    await admin
+      .from("push_subscriptions")
+      .delete()
+      .eq("device_id", deviceId)
+      .neq("endpoint", sub.endpoint);
+  }
   // upsert على endpoint (جهاز واحد قد يبدّل مستخدمه)
   const { error } = await admin
     .from("push_subscriptions")
