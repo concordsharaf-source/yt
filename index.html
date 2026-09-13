@@ -1084,6 +1084,7 @@ function initApp() {
         renderCalendar();
         renderLandscapeCalendar();
         renderMobileDayView();
+        syncScheduleToSupabase();
     });
     
 
@@ -1099,6 +1100,7 @@ function initApp() {
             renderSettings();
             renderScheduleRules();
         }
+        syncScheduleToSupabase();
     });
 
     db.ref('scheduleRules').on('value', function(snapshot) {
@@ -1113,6 +1115,7 @@ function initApp() {
         renderCalendar();
         renderLandscapeCalendar();
         renderMobileDayView();
+        syncScheduleToSupabase();
     });
     
     startListeningForChatNotifications();
@@ -1129,7 +1132,10 @@ function initApp() {
     showPage('calendar');
     setInterval(checkShiftNotifications, 60000);
     checkShiftNotifications();
-    
+    // مزامنة أولية من الكاش المحلي فوراً (ثم يعاد عند وصول بيانات Firebase)
+    syncScheduleToSupabase();
+    setTimeout(syncScheduleToSupabase, 8000);
+
 }
 
 // ===== وضع لاندسكيب =====
@@ -2521,6 +2527,36 @@ function startSwapRequestListener() {
 }
 
 // ===== الإشعارات =====
+// ===== مزامنة جدول الورديات إلى Supabase (للتنبيهات المجدولة التي تصل والتطبيق مغلق) =====
+let __shiftSyncTimer = null;
+function syncScheduleToSupabase() {
+    if (!window.YTPush || typeof YTPush.syncSchedule !== 'function') return;
+    if (typeof getEmployeeForDate !== 'function') return;
+    clearTimeout(__shiftSyncTimer);
+    __shiftSyncTimer = setTimeout(function () {
+        try {
+            const entries = [];
+            const base = new Date();
+            base.setHours(0, 0, 0, 0);
+            // نغطي اليوم + 29 يوماً قادمةً (يكفي لإشعار الغد حتى لو لم يفتح أحد التطبيق)
+            for (let i = 0; i < 30; i++) {
+                const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+                const emp = getEmployeeForDate(d);
+                if (!emp) continue;
+                const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+                entries.push({
+                    date_key: `${y}-${m}-${day}`,
+                    shift_date: `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+                    employee_id: Number(emp.id),
+                    employee_name: getEmployeeUsername(emp.id) || emp.name || '',
+                    day_week: d.getDay()
+                });
+            }
+            if (entries.length) YTPush.syncSchedule(entries).catch(function () {});
+        } catch (e) {}
+    }, 2000);
+}
+
 function checkShiftNotifications() {
     if (!currentUser || currentUser.role === 'admin') return;
     

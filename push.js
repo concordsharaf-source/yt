@@ -123,6 +123,13 @@
     }).catch(function (e) { console.warn('notifyAllDevices failed:', e); });
   }
 
+  // يزامن جدول الورديات المحسوب (التناوب + التعيينات اليدوية) إلى Supabase
+  // لاستخدامه في تنبيهات الكرون التي تصل والتطبيق مغلق.
+  async function syncSchedule(entries) {
+    if (!entries || !entries.length) return { ok: true, synced: 0 };
+    return callFunction({ action: 'sync_shifts', shifts: entries });
+  }
+
   async function unsubscribeCurrent() {
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -139,6 +146,7 @@
     subscribeAndSave: subscribeAndSave,
     notifyUser: notifyUser,
     notifyAllDevices: notifyAllDevices,
+    syncSchedule: syncSchedule,
     unsubscribeCurrent: unsubscribeCurrent,
     getDeviceId: getDeviceId
   };

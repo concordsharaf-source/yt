@@ -106,6 +106,43 @@ async function handleUnregister(admin: SupabaseClient, p: any) {
   return jsonResponse({ ok: true, unregistered: true });
 }
 
+// ---------- مزامنة جدول الورديات (من التطبيق) ----------
+async function handleSyncShifts(admin: SupabaseClient, p: any) {
+  const rows = p?.shifts;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return jsonResponse({ error: "shifts[] required" }, 400);
+  }
+  const clean = rows
+    .filter((r: any) => r?.date_key && r?.shift_date)
+    .map((r: any) => ({
+      date_key: String(r.date_key),
+      shift_date: String(r.shift_date),
+      employee_id: r.employee_id != null ? Number(r.employee_id) : null,
+      employee_name: r.employee_name ? String(r.employee_name) : null,
+      day_week: r.day_week != null ? Number(r.day_week) : new Date(r.shift_date).getDay(),
+      updated_at: new Date().toISOString(),
+    }));
+  if (clean.length === 0) return jsonResponse({ error: "no valid shifts" }, 400);
+
+  let upsertError: any = null;
+  try {
+    const res = await admin.from("shift_schedule").upsert(clean, { onConflict: "date_key" });
+    upsertError = res.error;
+  } catch (e: any) {
+    upsertError = { message: String(e?.stack || e) };
+  }
+  if (upsertError) return jsonResponse({ error: upsertError.message, details: upsertError.details, hint: upsertError.hint, sample: clean[0] }, 500);
+
+  // تنظيف الأيام القديمة (أقدم من أمس)
+  try {
+    await admin.from("shift_schedule").lt("shift_date", new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10));
+  } catch {
+    /* غير حرج */
+  }
+
+  return jsonResponse({ ok: true, synced: clean.length });
+}
+
 // ---------- تحديد المستلمين ----------
 
 async function resolveRecipients(
@@ -175,6 +212,11 @@ Deno.serve(async (req: Request) => {
 
   if (p?.action === "register") return handleRegister(admin, p);
   if (p?.action === "unregister") return handleUnregister(admin, p);
+  if (p?.action === "sync_shifts") return handleSyncShifts(admin, p);
+  // قيم action أخرى ("send" أو بدون action) تكمل لمسار الإرسال
+  if (p?.action && p.action !== "send") {
+    return jsonResponse({ error: "Unknown action: " + p.action }, 400);
+  }
 
   const { rows, error } = await resolveRecipients(admin, p);
   if (error) return error;
