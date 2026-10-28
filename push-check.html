@@ -34,6 +34,7 @@
 
 <h1>🔔 فحص سلسلة الإشعارات</h1>
 <div class="sub">تطبيق جدول الورديات — يعمل مباشرة من الموقع المنشور</div>
+<div id="build" style="font-size:12px;opacity:.65;margin:6px 0 10px">نسخة الفحص: v2.0 — 2026-10-28</div>
 
 <div id="verdict" class="verdict v-wait">اضغط «تشغيل الفحص الشامل» للبدء.</div>
 
@@ -82,15 +83,19 @@ function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&am
 var RESULT = {};
 function setVerdict(){
   var v = document.getElementById('verdict');
+  var pre = RESULT.preflightStatus || '—';
+  var post = RESULT.postStatus || '—';
   if (RESULT.serverPostOk) {
     v.className='verdict v-good';
-    v.innerHTML='✅ السلسلة سليمة: الخادم يستقبل الطلبات. أرسل رسالة من جهاز آخر والتطبيق مغلق للتأكد.';
+    v.innerHTML='✅ <b>الخادم يستقبل الطلبات بنجاح من هذا المتصفح.</b><br>'+
+      'OPTIONS: <code>'+esc(pre)+'</code> &nbsp;|&nbsp; POST: <code>'+esc(post)+'</code><br>'+
+      'سلسلة Web Push (المتصفح ← Supabase) سليمة. أرسل رسالة من جهاز آخر والتطبيق مغلق للتأكد.';
   } else if (RESULT.serverBlocked) {
     v.className='verdict v-bad';
-    v.innerHTML='❌ <b>السبب الجذري مؤكَّد:</b> التطبيق لا يستطيع الوصول لخادم الإرسال.<br>'+
-      'طلب الـ preflight يردّ <code>405</code> بدون ترويسات CORS، والـ POST يردّ <code>401 unauthorized</code>.<br>'+
-      'النتيجة: لا يُرسل أي Web Push، وتبقى الإشعارات محلية تعمل فقط والصفحة مفتوحة.<br>'+
-      '<span style="font-weight:400">الإصلاح: نشر الدالة الصحيحة على Supabase + ضبط <code>APP_PUSH_KEY</code> + تطبيق الهجرات. راجع ملف التشخيص.</span>';
+    v.innerHTML='❌ <b>تعذّر الوصول لخادم الإرسال من هذا المتصفح.</b><br>'+
+      'OPTIONS: <code>'+esc(pre)+'</code> &nbsp;|&nbsp; POST: <code>'+esc(post)+'</code><br>'+
+      '<span style="font-weight:400">السبب المُبلّغ: '+esc(RESULT.serverDetail || 'راجع السجل أدناه')+'</span><br>'+
+      '<span style="font-weight:400">إن كان POST يعطي 200 في السجل لكن تظهر هذه الرسالة، حدّث الصفحة بـ Ctrl+F5.</span>';
   } else {
     v.className='verdict v-wait';
     v.innerHTML='⚠️ تعذّر الحكم — راجع السجل أدناه.';
@@ -156,39 +161,60 @@ async function checkServer(){
   row(g,'ℹ️','رابط الدالة', FN,'dim');
   row(g,'ℹ️','مفتاح التطبيق (x-app-key)', APP_KEY.slice(0,8)+'…'+APP_KEY.slice(-6),'dim');
 
-  /* 1) فحص استجابة OPTIONS (المتصفح يولّد preflight الحقيقي تلقائياً مع الـ POST أدناه) */
-  var preflightOk=false;
+  /* 1) طلب OPTIONS مباشر — معلوماتي فقط.
+        ملاحظة: بعض المتصفحات تمنع إرسال OPTIONS يدوياً من fetch،
+        والـ preflight الحقيقي يُولّده المتصفح تلقائياً مع الـ POST أدناه.
+        لذلك لا يُستخدم هذا الطلب في الحكم على النتيجة. */
   try {
-    var r0 = await fetch(FN, { method:'OPTIONS', mode:'cors' });
+    var r0 = await fetch(FN+'?t='+Date.now(), { method:'OPTIONS', mode:'cors', cache:'no-store' });
     var acao = r0.headers.get('access-control-allow-origin');
-    log('OPTIONS -> '+r0.status+' | ACAO='+acao+' | '+(await r0.text().catch(()=>'')).slice(0,120));
-    preflightOk = r0.ok && !!acao;
-    row(g, preflightOk?'✅':'❌','استجابة OPTIONS / ترويسات CORS', 'HTTP '+r0.status+' | Access-Control-Allow-Origin: '+(acao||'غير موجود'), preflightOk?'ok':'bad');
+    RESULT.preflightStatus = 'HTTP '+r0.status+(acao?(' | ACAO='+acao):' | بلا ACAO');
+    log('OPTIONS -> '+r0.status+' | ACAO='+acao);
+    row(g, r0.ok&&acao?'✅':'⚠️','استجابة OPTIONS / ترويسات CORS',
+        RESULT.preflightStatus+' — (معلوماتي؛ المعيار الحقيقي هو POST)', r0.ok&&acao?'ok':'warn');
   } catch(e){
-    log('OPTIONS failed: '+e);
-    row(g,'❌','استجابة OPTIONS / ترويسات CORS', 'فشل شبكي/CORS: '+e, 'bad');
+    RESULT.preflightStatus = 'غير متاح من JS ('+String(e).slice(0,60)+')';
+    log('OPTIONS (معلوماتي) failed: '+e);
+    row(g,'ℹ️','استجابة OPTIONS المباشر',
+        'بعض المتصفحات تمنع OPTIONS اليدوي — الـ preflight الحقيقي يُجرى تلقائياً مع POST','dim');
   }
 
-  /* 2) POST آمن: مستخدم وهمي لا يملك أجهزة ⇒ لا يُرسل أي إشعار */
+  /* 2) POST حقيقي — هذا هو المعيار الوحيد للنجاح:
+        يُولّد preflight CORS تلقائياً + يتحقق من المصادقة + يستجيب الخادم.
+        مستخدم وهمي لا يملك أجهزة ⇒ لا يُرسل أي إشعار فعلي. */
   var postOk=false;
   try {
-    var r = await fetch(FN, { method:'POST', mode:'cors', headers:{
+    var r = await fetch(FN+'?t='+Date.now(), { method:'POST', mode:'cors', cache:'no-store', headers:{
       'Content-Type':'application/json','x-app-key':APP_KEY
     }, body: JSON.stringify({action:'send', app_user:'__push_check_probe__', payload:{title:'probe',body:'probe'}}) });
     var t = await r.text().catch(()=>'');
+    RESULT.postStatus = 'HTTP '+r.status;
     log('POST -> '+r.status+' | '+t.slice(0,200));
     postOk = r.ok;
     row(g, r.ok?'✅':'❌','استجابة POST للتطبيق', 'HTTP '+r.status+' | '+esc(t.slice(0,110)), r.ok?'ok':'bad');
+    if (!r.ok) RESULT.serverDetail = 'POST رجع '+r.status+' — '+t.slice(0,160);
   } catch(e){
+    RESULT.postStatus = 'خطأ شبكة/CORS';
+    RESULT.serverDetail = String(e).slice(0,200);
     log('POST failed: '+e);
-    row(g,'❌','استجابة POST للتطبيق', 'محجوب بـ CORS/شبكة: '+e, 'bad');
+    row(g,'❌','استجابة POST للتطبيق', 'محجوب بـ CORS/شبكة: '+esc(String(e).slice(0,150)), 'bad');
   }
 
-  RESULT.serverPostOk = preflightOk && postOk;
-  RESULT.serverBlocked = !RESULT.serverPostOk;
-  if (!RESULT.serverPostOk) {
-    row(g,'⚠️','الخلاصة','الدالة المنشورة لا تعالج OPTIONS ولا تقبل المفتاح → كل طلبات push.js تفشل','warn');
-  }
+  /* 3) فحص diag — يؤكد أن زوج VAPID على الخادم متطابق */
+  try {
+    var rd = await fetch(FN+'?t='+Date.now(), { method:'POST', mode:'cors', cache:'no-store', headers:{
+      'Content-Type':'application/json','x-app-key':APP_KEY
+    }, body: JSON.stringify({action:'diag'}) });
+    var dj = await rd.json().catch(()=>({}));
+    log('diag -> '+rd.status+' | '+JSON.stringify(dj).slice(0,260));
+    row(g, rd.ok&&dj.yt_private_matches_yt_public?'✅':'⚠️','اتساق مفتاح VAPID على الخادم',
+        'HTTP '+rd.status+' | yt_private_matches_yt_public: '+dj.yt_private_matches_yt_public+
+        ' | subscription_rows: '+dj.subscription_rows, rd.ok&&dj.yt_private_matches_yt_public?'ok':'warn');
+  } catch(e){ log('diag failed: '+e); }
+
+  RESULT.serverPostOk = postOk;          // يعتمد على POST فقط
+  RESULT.serverBlocked = !postOk;
+  if (!postOk) row(g,'⚠️','الخلاصة','POST لم ينجح — تحقق من الاتصال أو من مفتاح التطبيق','warn');
 }
 
 async function checkFirebase(){
