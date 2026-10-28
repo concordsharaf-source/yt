@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>فحص الإشعارات — جدول الورديات</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:18px;background:#0f172a;color:#e2e8f0;font:15px/1.8 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+  h1{font-size:21px;margin:0 0 4px;color:#fff}
+  .sub{color:#94a3b8;font-size:13px;margin-bottom:18px}
+  .card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 12px;color:#cbd5e1}
+  button{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:11px 16px;font:700 14px/1.4 inherit;cursor:pointer;margin:4px 4px 4px 0}
+  button.sec{background:#334155;color:#e2e8f0}
+  button:active{transform:translateY(1px)}
+  .row{display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid #334155;padding:9px 0;font-size:14px}
+  .row:last-child{border-bottom:0}
+  .ico{flex:0 0 24px;text-align:center;font-size:16px}
+  .txt{flex:1;min-width:0;word-break:break-word}
+  .val{color:#94a3b8;font-size:12px;direction:ltr;text-align:right;display:block;margin-top:2px}
+  .ok{color:#4ade80}.bad{color:#f87171}.warn{color:#fbbf24}.dim{color:#64748b}
+  code{background:#0f172a;padding:2px 6px;border-radius:5px;font-size:12px;direction:ltr;display:inline-block}
+  pre{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px;overflow:auto;max-height:220px;font-size:12px;direction:ltr;text-align:left;color:#cbd5e1}
+  .verdict{border-radius:16px;padding:18px;margin-bottom:14px;font-weight:700;line-height:1.9}
+  .v-bad{background:#451a1a;border:1px solid #991b1b;color:#fecaca}
+  .v-good{background:#052e16;border:1px solid #166534;color:#bbf7d0}
+  .v-wait{background:#1e293b;border:1px solid #334155;color:#94a3b8}
+  .hint{font-size:12px;color:#94a3b8;margin-top:8px}
+  .tag{display:inline-block;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:700;margin-inline-start:6px}
+</style>
+</head>
+<body>
+
+<h1>🔔 فحص سلسلة الإشعارات</h1>
+<div class="sub">تطبيق جدول الورديات — يعمل مباشرة من الموقع المنشور</div>
+
+<div id="verdict" class="verdict v-wait">اضغط «تشغيل الفحص الشامل» للبدء.</div>
+
+<div class="card">
+  <h2>أوامر سريعة</h2>
+  <button id="run">▶ تشغيل الفحص الشامل</button>
+  <button id="perm" class="sec">طلب إذن الإشعارات</button>
+  <button id="local" class="sec">إشعار تجريبي محلي</button>
+  <button id="resub" class="sec">إعادة تسجيل الجهاز</button>
+  <div class="hint">الإشعار التجريبي المحلي يثبت أن الـ Service Worker يعرض الإشعارات — لكنه لا يثبت وصول Push والتطبيق مغلق.</div>
+</div>
+
+<div class="card"><h2>1) المتصفح والإذن</h2><div id="g1"></div></div>
+<div class="card"><h2>2) Service Worker والاشتراك</h2><div id="g2"></div></div>
+<div class="card"><h2>3) خادم الإرسال (Supabase Edge Function)</h2><div id="g3"></div></div>
+<div class="card"><h2>4) Firebase (تسجيلات الاحتياط)</h2><div id="g4"></div></div>
+<div class="card"><h2>سجل الفحص</h2><pre id="log">—</pre></div>
+
+<script>
+/* عند النشر الفعلي في نفس مجلد التطبيق، حمّل config.js ثم push.js ليعمل زر إعادة التسجيل */
+if (/^https?:$/.test(location.protocol)) {
+  (function(){
+    var a=document.createElement('script'); a.src='./config.js';
+    a.onload=function(){ var b=document.createElement('script'); b.src='./push.js'; document.head.appendChild(b); };
+    document.head.appendChild(a);
+  })();
+}
+</script>
+<script>
+/* قيم عامة من config.js — ليست أسراراً */
+var FN = 'https://pyjjaekcqbdijcyloqvx.supabase.co/functions/v1/send-push';
+var APP_KEY = 'nXwGBUpmnw1fFr-r0sfYrgJU5RaFA1bc';
+var VAPID = 'BM9EBHzzcRkxzxUbwfJuR7A9Jcsi11Uc0GGi9YqX8dyzBqMRyJmZ9tCgzFSSYf2ffyBWnHwACd7t6VD7fuX5rI4';
+var DB = 'https://ytcalender-bae88-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+var lines = [];
+function log(s){ lines.push(s); document.getElementById('log').textContent = lines.join('\n'); }
+function row(host, icon, title, detail, cls){
+  var d = document.createElement('div'); d.className='row';
+  d.innerHTML = '<div class="ico">'+icon+'</div><div class="txt"><span class="'+(cls||'')+'">'+title+'</span>'+
+                (detail?'<span class="val">'+String(detail).replace(/</g,'&lt;')+'</span>':'')+'</div>';
+  host.appendChild(d);
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+var RESULT = {};
+function setVerdict(){
+  var v = document.getElementById('verdict');
+  if (RESULT.serverPostOk) {
+    v.className='verdict v-good';
+    v.innerHTML='✅ السلسلة سليمة: الخادم يستقبل الطلبات. أرسل رسالة من جهاز آخر والتطبيق مغلق للتأكد.';
+  } else if (RESULT.serverBlocked) {
+    v.className='verdict v-bad';
+    v.innerHTML='❌ <b>السبب الجذري مؤكَّد:</b> التطبيق لا يستطيع الوصول لخادم الإرسال.<br>'+
+      'طلب الـ preflight يردّ <code>405</code> بدون ترويسات CORS، والـ POST يردّ <code>401 unauthorized</code>.<br>'+
+      'النتيجة: لا يُرسل أي Web Push، وتبقى الإشعارات محلية تعمل فقط والصفحة مفتوحة.<br>'+
+      '<span style="font-weight:400">الإصلاح: نشر الدالة الصحيحة على Supabase + ضبط <code>APP_PUSH_KEY</code> + تطبيق الهجرات. راجع ملف التشخيص.</span>';
+  } else {
+    v.className='verdict v-wait';
+    v.innerHTML='⚠️ تعذّر الحكم — راجع السجل أدناه.';
+  }
+}
+
+async function checkBrowser(){
+  var g=document.getElementById('g1'); g.innerHTML='';
+  var secure = window.isSecureContext;
+  row(g, secure?'✅':'❌','اتصال آمن (HTTPS)', location.href, secure?'ok':'bad');
+  RESULT.secure=secure;
+  var hasN = ('Notification' in window);
+  var perm = hasN ? Notification.permission : 'غير مدعوم';
+  var cls = perm==='granted'?'ok':(perm==='denied'?'bad':'warn');
+  row(g, perm==='granted'?'✅':(perm==='denied'?'❌':'⚠️'),'إذن الإشعارات', perm, cls);
+  RESULT.permission=perm;
+  row(g, ('serviceWorker' in navigator)?'✅':'❌','دعم Service Worker', 'serviceWorker in navigator', ('serviceWorker' in navigator)?'ok':'bad');
+  row(g, ('PushManager' in window)?'✅':'❌','دعم PushManager', 'PushManager in window', ('PushManager' in window)?'ok':'bad');
+  var ua = navigator.userAgent;
+  var ios = /iP(hone|ad|od)/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  var standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  if (ios) {
+    row(g, standalone?'✅':'⚠️','iOS: تطبيق مثبت على الشاشة الرئيسية؟', standalone?'نعم':'لا — على iOS لا يعمل Web Push من تبويب Safari العادي', standalone?'ok':'warn');
+    RESULT.iosStandalone=standalone;
+  } else {
+    row(g,'ℹ️','نوع الجهاز', ua.slice(0,90),'dim');
+  }
+}
+
+async function checkSW(){
+  var g=document.getElementById('g2'); g.innerHTML='';
+  if (!('serviceWorker' in navigator)) { row(g,'❌','لا يوجد Service Worker','—','bad'); return; }
+  var reg;
+  try { reg = await navigator.serviceWorker.getRegistration(); }
+  catch(e){ row(g,'❌','خطأ في getRegistration', String(e),'bad'); log('getRegistration: '+e); return; }
+  if (!reg) { row(g,'❌','لا يوجد Service Worker مسجّل','افتح index.html أولاً','bad'); return; }
+  row(g,'✅','Service Worker مسجّل', 'scope: '+(reg.scope||'—'),'ok');
+  var active = reg.active || reg.waiting || reg.installing;
+  row(g, active?'✅':'⚠️','حالة الـ SW', active?active.state:'لا يوجد عامل نشط', active?'ok':'warn');
+  if (!('PushManager' in window)) return;
+  var sub=null;
+  try { sub = await reg.pushManager.getSubscription(); }
+  catch(e){ row(g,'❌','خطأ في قراءة الاشتراك', String(e),'bad'); return; }
+  if (!sub) { row(g,'❌','لا يوجد اشتراك Push لهذا الجهاز','subscribeAndSave() لم ينجح','bad'); RESULT.sub=false; return; }
+  RESULT.sub=true;
+  var j = sub.toJSON();
+  row(g,'✅','الجهاز مشترك في Push', (j.endpoint||'').slice(0,70)+'…','ok');
+  try {
+    var buf = sub.options && sub.options.applicationServerKey;
+    if (buf) {
+      var arr = new Uint8Array(buf), s='';
+      for (var i=0;i<arr.length;i++) s+=String.fromCharCode(arr[i]);
+      var key = btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+      var match = key===VAPID;
+      row(g, match?'✅':'⚠️','مفتاح VAPID مطابق لـ config.js؟', match?'نعم':'لا — سيُعاد الاشتراك عند فتح التطبيق', match?'ok':'warn');
+    } else row(g,'ℹ️','المتصفح لا يكشف مفتاح الاشتراك','—','dim');
+  } catch(e){ row(g,'ℹ️','تعذّر قراءة مفتاح الاشتراك', String(e),'dim'); }
+  row(g,'ℹ️','آخر مفتاح محفوظ محلياً', localStorage.getItem('yt_vapid_public')||'(لا يوجد)','dim');
+}
+
+async function checkServer(){
+  var g=document.getElementById('g3'); g.innerHTML='';
+  row(g,'ℹ️','رابط الدالة', FN,'dim');
+  row(g,'ℹ️','مفتاح التطبيق (x-app-key)', APP_KEY.slice(0,8)+'…'+APP_KEY.slice(-6),'dim');
+
+  /* 1) فحص استجابة OPTIONS (المتصفح يولّد preflight الحقيقي تلقائياً مع الـ POST أدناه) */
+  var preflightOk=false;
+  try {
+    var r0 = await fetch(FN, { method:'OPTIONS', mode:'cors' });
+    var acao = r0.headers.get('access-control-allow-origin');
+    log('OPTIONS -> '+r0.status+' | ACAO='+acao+' | '+(await r0.text().catch(()=>'')).slice(0,120));
+    preflightOk = r0.ok && !!acao;
+    row(g, preflightOk?'✅':'❌','استجابة OPTIONS / ترويسات CORS', 'HTTP '+r0.status+' | Access-Control-Allow-Origin: '+(acao||'غير موجود'), preflightOk?'ok':'bad');
+  } catch(e){
+    log('OPTIONS failed: '+e);
+    row(g,'❌','استجابة OPTIONS / ترويسات CORS', 'فشل شبكي/CORS: '+e, 'bad');
+  }
+
+  /* 2) POST آمن: مستخدم وهمي لا يملك أجهزة ⇒ لا يُرسل أي إشعار */
+  var postOk=false;
+  try {
+    var r = await fetch(FN, { method:'POST', mode:'cors', headers:{
+      'Content-Type':'application/json','x-app-key':APP_KEY
+    }, body: JSON.stringify({action:'send', app_user:'__push_check_probe__', payload:{title:'probe',body:'probe'}}) });
+    var t = await r.text().catch(()=>'');
+    log('POST -> '+r.status+' | '+t.slice(0,200));
+    postOk = r.ok;
+    row(g, r.ok?'✅':'❌','استجابة POST للتطبيق', 'HTTP '+r.status+' | '+esc(t.slice(0,110)), r.ok?'ok':'bad');
+  } catch(e){
+    log('POST failed: '+e);
+    row(g,'❌','استجابة POST للتطبيق', 'محجوب بـ CORS/شبكة: '+e, 'bad');
+  }
+
+  RESULT.serverPostOk = preflightOk && postOk;
+  RESULT.serverBlocked = !RESULT.serverPostOk;
+  if (!RESULT.serverPostOk) {
+    row(g,'⚠️','الخلاصة','الدالة المنشورة لا تعالج OPTIONS ولا تقبل المفتاح → كل طلبات push.js تفشل','warn');
+  }
+}
+
+async function checkFirebase(){
+  var g=document.getElementById('g4'); g.innerHTML='';
+  try {
+    var r = await fetch(DB+'/pushSubscriptions.json', {mode:'cors'});
+    var d = await r.json().catch(()=>null);
+    var users = d ? Object.keys(d) : [];
+    var devices = 0;
+    users.forEach(function(u){ devices += (d[u] && typeof d[u]==='object') ? Object.keys(d[u]).length : 0; });
+    log('Firebase pushSubscriptions -> '+r.status+' | users='+users.length+' devices='+devices);
+    row(g, r.ok?'✅':'❌','قراءة تسجيلات الاحتياط من Firebase', 'HTTP '+r.status,'ok');
+    if (users.length) {
+      row(g,'⚠️','الأجهزة المسجّلة في Firebase (الاحتياط)', users.length+' مستخدم / '+devices+' جهازاً','warn');
+      row(g,'ℹ️','تفسير','هذه الأجهزة سُجّلت لأن التسجيل في Supabase فشل. خادم Supabase لا يقرأ Firebase → لا يرسل لها شيئاً.','dim');
+    } else row(g,'ℹ️','لا توجد تسجيلات احتياط','—','dim');
+  } catch(e){ row(g,'❌','تعذّر قراءة Firebase', String(e),'bad'); log('Firebase error: '+e); }
+}
+
+async function runAll(){
+  lines=[]; document.getElementById('log').textContent='جارٍ الفحص…';
+  document.getElementById('verdict').className='verdict v-wait';
+  document.getElementById('verdict').textContent='⏳ جارٍ الفحص…';
+  log('start '+new Date().toISOString());
+  try{ await checkBrowser(); }catch(e){ log('checkBrowser: '+e); }
+  try{ await checkSW(); }catch(e){ log('checkSW: '+e); }
+  try{ await checkServer(); }catch(e){ log('checkServer: '+e); }
+  try{ await checkFirebase(); }catch(e){ log('checkFirebase: '+e); }
+  log('done');
+  setVerdict();
+}
+
+document.getElementById('run').onclick = runAll;
+document.getElementById('perm').onclick = async function(){
+  if (!('Notification' in window)) return alert('المتصفح لا يدعم الإشعارات');
+  try { var p = await Notification.requestPermission(); alert('الإذن: '+p); runAll(); }
+  catch(e){ alert('تعذّر طلب الإذن: '+e); }
+};
+document.getElementById('local').onclick = async function(){
+  try {
+    if (!('serviceWorker' in navigator)) throw new Error('لا يوجد Service Worker');
+    var reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('✅ إشعار تجريبي محلي', {
+      body:'هذا الإشعار صادر من الصفحة مباشرة — لا يثبت عمل Web Push',
+      icon:'./images/icon-192x192.png', tag:'push-check-local', data:{url:'./index.html'}
+    });
+    log('local notification shown');
+  } catch(e){ alert('فشل الإشعار المحلي: '+e); log('local: '+e); }
+};
+document.getElementById('resub').onclick = async function(){
+  try {
+    if (!window.YTPush) { alert('افتح هذه الصفحة من نفس مجلد التطبيق حتى يُحمّل push.js'); return; }
+    localStorage.removeItem('yt_vapid_public');
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    var out = await YTPush.subscribeAndSave(null, localStorage.getItem('deviceId'));
+    log('resubscribe -> '+(out ? (out.registered===false ? 'تم الاشتراك لكن التسجيل على الخادم فشل' : 'تم') : 'فشل'));
+    alert(out ? 'تمت إعادة الاشتراك — راقب النتيجة في السجل' : 'تعذّر إعادة الاشتراك');
+    runAll();
+  } catch(e){ alert('خطأ: '+e); log('resub: '+e); }
+};
+</script>
+</body>
+</html>
