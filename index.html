@@ -9,7 +9,12 @@
 <link rel="stylesheet" href="tw.css">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#1d4ed8">
-<link rel="apple-touch-icon" href="images/icon-192x192.png">
+<link rel="icon" type="image/png" sizes="64x64" href="images/favicon-64.png">
+<link rel="icon" type="image/png" sizes="192x192" href="images/icon-192x192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="الورديات">
 <script src="config.js"></script>
 <script src="push.js"></script>
 
@@ -209,6 +214,108 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 .chat-badge.is-visible {
     display: flex !important;
 }
+</style>
+
+<style id="swap-ui">
+/* ===== واجهة طلبات تبديل الورديات — مستقلة عن tw.css ===== */
+.sw-overlay { position: fixed; inset: 0; z-index: 60; padding: 16px; align-items: center; justify-content: center; }
+.sw-overlay:not(.hidden) { display: flex; }
+.sw-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.sw-panel { position: relative; z-index: 1; width: 100%; max-width: 470px; max-height: min(88vh, 780px);
+  display: flex; flex-direction: column; background: #fff; border-radius: 22px; overflow: hidden;
+  box-shadow: 0 26px 70px rgba(2,6,23,.3); animation: swIn .22s ease-out; }
+.sw-panel-wide { max-width: 640px; }
+@keyframes swIn { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes swInMobile { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: none; } }
+
+.sw-head { display: flex; align-items: center; gap: 12px; padding: 17px 18px;
+  background: linear-gradient(120deg,#2563eb,#1e40af); color: #fff; flex: none; }
+.sw-head-icon { width: 42px; height: 42px; border-radius: 13px; background: rgba(255,255,255,.18);
+  display: grid; place-items: center; font-size: 22px; flex: none; }
+.sw-head-text { flex: 1; min-width: 0; }
+.sw-head h3 { margin: 0; font-size: 1.12rem; font-weight: 800; line-height: 1.35; }
+.sw-head p { margin: 3px 0 0; font-size: .76rem; opacity: .88; line-height: 1.4; }
+.sw-close { flex: none; width: 34px; height: 34px; border: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(255,255,255,.18); color: #fff; font-size: 21px; line-height: 1; }
+.sw-close:hover { background: rgba(255,255,255,.32); }
+
+.sw-body { padding: 17px 18px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+.sw-foot { padding: 13px 18px 17px; border-top: 1px solid #eef2f7; background: #fbfdff;
+  display: flex; gap: 10px; flex: none; }
+
+.sw-section { border: 1.5px solid #e7edf6; border-radius: 16px; padding: 14px; margin-bottom: 13px; background: #fbfdff; }
+.sw-section:last-of-type { margin-bottom: 4px; }
+.sw-section-title { display: flex; align-items: center; gap: 8px; font-weight: 800;
+  color: #1e3a8a; font-size: .88rem; margin-bottom: 11px; }
+.sw-step { width: 24px; height: 24px; border-radius: 8px; background: #dbeafe; color: #1d4ed8;
+  display: grid; place-items: center; font-size: .75rem; font-weight: 800; flex: none; }
+.sw-label { display: block; font-size: .82rem; font-weight: 800; color: #475569; margin: 0 0 6px; }
+.sw-input, .sw-select { width: 100%; min-height: 49px; padding: 11px 13px; border: 1.5px solid #dbe3ef;
+  border-radius: 12px; font-family: inherit; font-size: 1rem; font-weight: 600; color: #0f172a;
+  background: #fff; outline: none; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; }
+.sw-input:focus, .sw-select:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,.12); }
+.sw-select { appearance: none; -webkit-appearance: none; padding-left: 38px; cursor: pointer;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%2364748b' d='M1 1l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: left 14px center; }
+.sw-hint { font-size: .78rem; color: #64748b; margin: 7px 0 0; line-height: 1.5; }
+.sw-info { margin-top: 9px; background: #eff6ff; border: 1px solid #dbeafe; color: #1e40af;
+  border-radius: 11px; padding: 9px 12px; font-size: .82rem; font-weight: 700; line-height: 1.6; }
+.sw-info.is-warn { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.sw-error { margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+  border-radius: 11px; padding: 10px 12px; font-size: .84rem; font-weight: 700; line-height: 1.6; }
+
+.sw-btn { flex: 1; min-height: 50px; border: 0; border-radius: 13px; font-family: inherit;
+  font-size: .97rem; font-weight: 800; cursor: pointer; transition: transform .12s, filter .12s; }
+.sw-btn:active { transform: translateY(1px); }
+.sw-btn:hover { filter: brightness(1.05); }
+.sw-btn-primary { background: linear-gradient(120deg,#2563eb,#1d4ed8); color: #fff;
+  box-shadow: 0 8px 20px rgba(37,99,235,.25); }
+.sw-btn-ghost { background: #eef2f7; color: #475569; }
+
+/* بطاقات الطلبات */
+.sw-list { display: flex; flex-direction: column; gap: 12px; }
+.sw-card { border: 1.5px solid #e5eaf2; border-radius: 16px; padding: 14px; background: #fff;
+  box-shadow: 0 3px 12px rgba(15,23,42,.05); }
+.sw-card.is-pending { border-color: #fcd34d; background: #fffdf5; }
+.sw-card.is-approved { border-color: #a7f3d0; background: #f6fdf9; }
+.sw-card.is-rejected { border-color: #fecaca; background: #fffafa; }
+.sw-card-top { display: flex; align-items: flex-start; gap: 10px; }
+.sw-avatar { width: 38px; height: 38px; border-radius: 12px; background: #e0e7ff; color: #3730a3;
+  display: grid; place-items: center; font-weight: 800; font-size: 1rem; flex: none; }
+.sw-card-title { font-weight: 800; color: #0f172a; font-size: .93rem; line-height: 1.5; word-break: break-word; }
+.sw-card-sub { font-size: .76rem; color: #64748b; margin-top: 2px; }
+.sw-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .7rem;
+  font-weight: 800; white-space: nowrap; flex: none; }
+.sw-badge.pending { background: #fef3c7; color: #92400e; }
+.sw-badge.approved { background: #dcfce7; color: #166534; }
+.sw-badge.rejected { background: #fee2e2; color: #991b1b; }
+.sw-dates { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px;
+  background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 11px; padding: 10px;
+  font-size: .8rem; font-weight: 700; color: #334155; }
+.sw-date-chip { background: #fff; border: 1px solid #e2e8f0; border-radius: 9px; padding: 6px 9px; }
+.sw-arrow { color: #2563eb; font-weight: 900; font-size: 1rem; }
+.sw-actions { display: flex; gap: 8px; margin-top: 12px; }
+.sw-actions .sw-btn { min-height: 45px; font-size: .9rem; }
+.sw-btn-ok { background: #16a34a; color: #fff; }
+.sw-btn-no { background: #fee2e2; color: #b91c1c; }
+.sw-btn-del { width: 100%; min-height: 38px; margin-top: 9px; background: transparent; color: #94a3b8;
+  border: 1px solid #e8edf4; border-radius: 10px; font-family: inherit; font-size: .77rem;
+  font-weight: 700; cursor: pointer; }
+.sw-btn-del:hover { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+.sw-empty { text-align: center; padding: 36px 16px; color: #64748b; }
+.sw-empty-icon { font-size: 2.4rem; display: block; margin-bottom: 8px; }
+.sw-empty b { color: #334155; font-size: .95rem; }
+.sw-empty p { margin: 6px 0 0; font-size: .8rem; }
+
+#employeeAvatar { background: #fff; object-fit: cover; }
+
+@media (max-width: 520px) {
+  .sw-overlay { padding: 0; align-items: flex-end; }
+  .sw-panel, .sw-panel-wide { max-width: 100%; max-height: 92vh;
+    border-radius: 22px 22px 0 0; animation-name: swInMobile; }
+  .sw-foot { padding-bottom: max(17px, env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .sw-panel { animation: none; } }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -432,38 +539,63 @@ body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; width: 100%; posi
 </div>
 
 <!-- مودال طلب تبديل الوردية -->
-<div id="swapRequestModal" class="fixed inset-0 z-50 hidden">
-    <div class="modal-overlay absolute inset-0" onclick="closeSwapRequestModal()"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-5 w-[min(92vw,420px)] max-h-[90vh] overflow-y-auto">
-        <h3 class="text-xl font-bold mb-2">🔄 طلب تبديل وردية</h3>
-        <p class="text-sm text-gray-500 mb-4">اختر ورديتك اليوم أو وردية قادمة ووردية الموظف البديل. لا يمكن طلب تبديل يوم ماضٍ.</p>
-        <label class="block text-sm font-bold mb-1">يوم ورديتك</label>
-        <input id="swapMyDate" type="date" class="w-full p-3 border rounded-lg mb-3">
-        <p id="swapMyDateDisplay" class="text-sm font-bold text-blue-700 mb-2"></p>
-        <p id="swapMyShiftInfo" class="text-xs text-blue-700 mb-3"></p>
-        <label class="block text-sm font-bold mb-1">الموظف البديل</label>
-        <select id="swapTargetEmployee" class="w-full p-3 border rounded-lg bg-white mb-3"></select>
-        <label class="block text-sm font-bold mb-1">يوم وردية البديل</label>
-        <input id="swapTargetDate" type="date" class="w-full p-3 border rounded-lg mb-3">
-        <p id="swapTargetDateDisplay" class="text-sm font-bold text-blue-700 mb-2"></p>
-        <p id="swapTargetShiftInfo" class="text-xs text-blue-700 mb-3"></p>
-        <div id="swapRequestError" class="text-red-600 text-sm hidden mb-3"></div>
-        <div class="flex gap-2">
-            <button onclick="submitSwapRequest()" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold">إرسال الطلب</button>
-            <button onclick="closeSwapRequestModal()" class="flex-1 bg-gray-200 py-3 rounded-lg">إلغاء</button>
+<div id="swapRequestModal" class="sw-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="swRequestTitle">
+    <div class="sw-backdrop" onclick="closeSwapRequestModal()"></div>
+    <div class="sw-panel">
+        <div class="sw-head">
+            <div class="sw-head-icon">🔄</div>
+            <div class="sw-head-text">
+                <h3 id="swRequestTitle">طلب تبديل وردية</h3>
+                <p>حدّد يومك ويوم زميلك في ثلاث خطوات</p>
+            </div>
+            <button class="sw-close" onclick="closeSwapRequestModal()" aria-label="إغلاق">×</button>
+        </div>
+        <div class="sw-body">
+            <div class="sw-section">
+                <div class="sw-section-title"><span class="sw-step">1</span> ورديتك التي تريد تبديلها</div>
+                <label class="sw-label" for="swapMyDate">التاريخ</label>
+                <input id="swapMyDate" type="date" class="sw-input">
+                <p id="swapMyDateDisplay" class="sw-hint"></p>
+                <div id="swapMyShiftInfo" class="sw-info">اختر التاريخ أولاً</div>
+            </div>
+            <div class="sw-section">
+                <div class="sw-section-title"><span class="sw-step">2</span> الموظف البديل</div>
+                <label class="sw-label" for="swapTargetEmployee">الزميل الذي سيأخذ ورديتك</label>
+                <select id="swapTargetEmployee" class="sw-select"></select>
+            </div>
+            <div class="sw-section">
+                <div class="sw-section-title"><span class="sw-step">3</span> وردية البديل</div>
+                <label class="sw-label" for="swapTargetDate">التاريخ الذي سيعمل فيه البديل</label>
+                <input id="swapTargetDate" type="date" class="sw-input">
+                <p id="swapTargetDateDisplay" class="sw-hint"></p>
+                <div id="swapTargetShiftInfo" class="sw-info">اختر التاريخ أولاً</div>
+            </div>
+            <div id="swapRequestError" class="sw-error hidden"></div>
+        </div>
+        <div class="sw-foot">
+            <button class="sw-btn sw-btn-primary" onclick="submitSwapRequest()">إرسال الطلب</button>
+            <button class="sw-btn sw-btn-ghost" onclick="closeSwapRequestModal()">إلغاء</button>
         </div>
     </div>
 </div>
 
 <!-- مودال طلبات التبديل للأدمن -->
-<div id="swapRequestsModal" class="fixed inset-0 z-50 hidden">
-    <div class="modal-overlay absolute inset-0" onclick="closeSwapRequestsModal()"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-5 w-[min(94vw,620px)] max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-bold">🔄 طلبات تبديل الورديات</h3><button onclick="closeSwapRequestsModal()" class="text-gray-500 text-2xl">×</button></div>
-        <div id="swapRequestsList" class="space-y-3"></div>
+<div id="swapRequestsModal" class="sw-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="swListTitle">
+    <div class="sw-backdrop" onclick="closeSwapRequestsModal()"></div>
+    <div class="sw-panel sw-panel-wide">
+        <div class="sw-head">
+            <div class="sw-head-icon">📥</div>
+            <div class="sw-head-text">
+                <h3 id="swListTitle">طلبات تبديل الورديات</h3>
+                <p>راجع الطلبات ووافق أو ارفض</p>
+            </div>
+            <button class="sw-close" onclick="closeSwapRequestsModal()" aria-label="إغلاق">×</button>
+        </div>
+        <div class="sw-body">
+            <div id="swapRequestsList"></div>
+        </div>
     </div>
 </div>
-
 </div><!-- نهاية mainApp -->
 
 <div id="toastContainer" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;"></div>
@@ -2069,7 +2201,7 @@ function getEmployeeStyleByColor(color) {
 
 function createEmployeeProfile(name, id) {
     const style = getEmployeeStyle(id);
-    return { id: Number(id), name: name, color: style.color, bgClass: style.bgClass, image: 'images/icon-192x192.png', disabled: false };
+    return { id: Number(id), name: name, color: style.color, bgClass: style.bgClass, image: 'images/avatar-default.png', disabled: false };
 }
 
 function repairScheduleRules() {
@@ -2310,7 +2442,9 @@ function updateSwapDateInfo() {
     document.getElementById('swapMyDateDisplay').textContent = myDate ? 'التاريخ المختار: ' + formatSwapDate(document.getElementById('swapMyDate').value) : '';
     document.getElementById('swapTargetDateDisplay').textContent = targetDate ? 'التاريخ المختار: ' + formatSwapDate(document.getElementById('swapTargetDate').value) : '';
     document.getElementById('swapMyShiftInfo').textContent = myShift ? 'المناوب في هذا اليوم: ' + myShift.name : 'لا توجد وردية مسجلة لهذا اليوم';
+    document.getElementById('swapMyShiftInfo').classList.toggle('is-warn', !myShift);
     document.getElementById('swapTargetShiftInfo').textContent = targetShift ? 'المناوب في هذا اليوم: ' + targetShift.name : 'لا توجد وردية مسجلة لهذا اليوم';
+    document.getElementById('swapTargetShiftInfo').classList.toggle('is-warn', !targetShift);
     if (targetId && targetShift && targetShift.id !== targetId) {
         document.getElementById('swapTargetShiftInfo').textContent += ' — اختر يومًا يداوم فيه الموظف البديل';
     }
@@ -2437,30 +2571,52 @@ function renderSwapRequests() {
         return (swapRequests[b].createdAt || 0) - (swapRequests[a].createdAt || 0);
     });
     if (!keys.length) {
-        list.innerHTML = '<p class="text-center text-gray-500 py-6">لا توجد طلبات تبديل</p>';
+        list.innerHTML = '<div class="sw-empty"><span class="sw-empty-icon">📭</span>' +
+            '<b>لا توجد طلبات تبديل</b><p>ستظهر الطلبات الجديدة هنا فور وصولها.</p></div>';
         return;
     }
-    list.innerHTML = keys.map(function(key) {
+    list.innerHTML = '<div class="sw-list">' + keys.map(function(key) {
         const raw = swapRequests[key];
         const r = normalizeSwapRequest(raw);
         const valid = isValidSwapRequest(raw);
-        const pending = r.status === 'pending';
-        const status = r.status === 'approved' ? 'تمت الموافقة' : (r.status === 'rejected' ? 'مرفوض' : 'بانتظار القرار');
+        const st = r.status === 'approved' ? 'approved' : (r.status === 'rejected' ? 'rejected' : 'pending');
+        const statusText = st === 'approved' ? 'تمت الموافقة' : (st === 'rejected' ? 'مرفوض' : 'بانتظار القرار');
+        const k = String(key).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         if (!valid) {
-            return '<div class="border rounded-xl p-3 bg-red-50 border-red-300">' +
-                '<div class="font-bold text-red-700">طلب قديم أو غير مكتمل</div>' +
-                '<div class="text-xs text-gray-500 mt-1">لا يمكن تنفيذ هذا الطلب لأنه يفتقد بيانات التبديل.</div>' +
-                '<button onclick="deleteSwapRequest(\'' + key + '\')" style="background:#dc2626;color:#fff" class="w-full mt-3 py-2 rounded-lg font-bold">حذف الطلب</button>' +
-                '</div>';
+            return '<div class="sw-card is-rejected">' +
+                '<div class="sw-card-top"><div class="sw-avatar">!</div>' +
+                '<div style="flex:1;min-width:0"><div class="sw-card-title">طلب قديم أو غير مكتمل</div>' +
+                '<div class="sw-card-sub">لا يمكن تنفيذه لأنه يفتقد بيانات التبديل.</div></div></div>' +
+                '<button class="sw-btn-del" onclick="deleteSwapRequest(\'' + k + '\')">🗑 حذف الطلب</button></div>';
         }
-        return '<div class="border rounded-xl p-3 ' + (pending ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50') + '\">' +
-            '<div class="font-bold">' + escapeHtml(r.requester || '') + ' يطلب التبديل مع ' + escapeHtml(r.targetEmployee || '') + '</div>' +
-            '<div class="text-sm text-gray-600 mt-1">' + formatSwapDate(r.requesterDate) + ' ⇄ ' + formatSwapDate(r.targetDate) + '</div>' +
-            '<div class="text-xs mt-2 ' + (pending ? 'text-orange-700' : 'text-gray-500') + '\">' + status + '</div>' +
-            (pending ? '<div class="flex gap-2 mt-3"><button onclick="approveSwapRequest(\'' + key + '\')" style="background:#16a34a;color:#fff" class="flex-1 py-2 rounded-lg font-bold">سماح</button><button onclick="rejectSwapRequest(\'' + key + '\')" style="background:#dc2626;color:#fff" class="flex-1 py-2 rounded-lg font-bold">رفض</button></div>' : '') +
-            '<button onclick="deleteSwapRequest(\'' + key + '\')" style="background:#6b7280;color:#fff" class="w-full mt-2 py-2 rounded-lg text-sm font-bold">حذف الطلب</button>' +
-            '</div>';
-    }).join('');
+        const from = escapeHtml(r.requester || '');
+        const to = escapeHtml(r.targetEmployee || '');
+        const d1 = escapeHtml(formatSwapDate(r.requesterDate));
+        const d2 = escapeHtml(formatSwapDate(r.targetDate));
+        const initial = from ? escapeHtml(from.charAt(0)) : '؟';
+        return '<div class="sw-card is-' + st + '">' +
+            '<div class="sw-card-top">' +
+                '<div class="sw-avatar">' + initial + '</div>' +
+                '<div style="flex:1;min-width:0">' +
+                    '<div class="sw-card-title">' + from + ' ⇄ ' + to + '</div>' +
+                    '<div class="sw-card-sub">طلب تبديل وردية</div>' +
+                '</div>' +
+                '<span class="sw-badge ' + st + '">' + statusText + '</span>' +
+            '</div>' +
+            '<div class="sw-dates">' +
+                '<span class="sw-date-chip">📅 ' + d1 + '</span>' +
+                '<span class="sw-arrow">⇄</span>' +
+                '<span class="sw-date-chip">📅 ' + d2 + '</span>' +
+            '</div>' +
+            (st === 'pending'
+                ? '<div class="sw-actions">' +
+                  '<button class="sw-btn sw-btn-ok" onclick="approveSwapRequest(\'' + k + '\')">✓ قبول</button>' +
+                  '<button class="sw-btn sw-btn-no" onclick="rejectSwapRequest(\'' + k + '\')">✕ رفض</button>' +
+                  '</div>'
+                : '') +
+            '<button class="sw-btn-del" onclick="deleteSwapRequest(\'' + k + '\')">🗑 حذف الطلب</button>' +
+        '</div>';
+    }).join('') + '</div>';
 }
 
 function openSwapRequestsModal() {
@@ -2711,5 +2867,15 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
+<script>
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        ['swapRequestModal', 'swapRequestsModal'].forEach(function (id) {
+            var m = document.getElementById(id);
+            if (m) m.classList.add('hidden');
+        });
+    }
+});
+</script>
 </body>
 </html>
