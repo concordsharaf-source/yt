@@ -4,7 +4,7 @@ const CACHE_NAME = 'yt-calendar-offline-v10';
 // إعدادات Push من ملف الإعدادات المشترك (نفس مفتاح VAPID العام + رابط الدالة)
 try { importScripts('./config.js'); } catch (e) { /* سيعمل بثوابت احتياطية */ }
 const PUSH_CFG = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.supabasePush) ? APP_CONFIG.supabasePush : null;
-const FALLBACK_VAPID_PUBLIC = 'BDWpEgXrrowDqNe2tHNGIdNmEI2hjNCK8GxQXQhUfpIPievRwMgJhq-ZUbUpeOcrRHrOofp6OSmBwVMSXGsxIZQ';
+const FALLBACK_VAPID_PUBLIC = 'BM9EBHzzcRkxzxUbwfJuR7A9Jcsi11Uc0GGi9YqX8dyzBqMRyJmZ9tCgzFSSYf2ffyBWnHwACd7t6VD7fuX5rI4';
 const ICON = './images/icon-192x192.png';
 const APP_URL = './index.html';
 const CHAT_URL = './chat.html';
