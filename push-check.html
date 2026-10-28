@@ -241,11 +241,17 @@ document.getElementById('local').onclick = async function(){
 document.getElementById('resub').onclick = async function(){
   try {
     if (!window.YTPush) { alert('افتح هذه الصفحة من نفس مجلد التطبيق حتى يُحمّل push.js'); return; }
+    // اسم المستخدم الحقيقي من جلسة التطبيق (كما في index.html و chat.html)
+    var uname = '';
+    try { var cu = JSON.parse(localStorage.getItem('currentUser') || 'null'); uname = (cu && cu.username) || ''; } catch(e){ uname = localStorage.getItem('currentUser') || ''; }
+    if (!uname) { alert('سجّل الدخول في التطبيق أولاً ثم عد إلى هنا — الإشعارات الموجّهة تحتاج اسم المستخدم.'); return; }
     localStorage.removeItem('yt_vapid_public');
+    var reg0 = await navigator.serviceWorker.getRegistration();
+    if (!reg0) { try { await navigator.serviceWorker.register('./sw.js'); } catch(e){ log('SW register: '+e); } }
     var reg = await navigator.serviceWorker.ready;
     var sub = await reg.pushManager.getSubscription();
     if (sub) await sub.unsubscribe();
-    var out = await YTPush.subscribeAndSave(null, localStorage.getItem('deviceId'));
+    var out = await YTPush.subscribeAndSave(null, uname);
     log('resubscribe -> '+(out ? (out.registered===false ? 'تم الاشتراك لكن التسجيل على الخادم فشل' : 'تم') : 'فشل'));
     alert(out ? 'تمت إعادة الاشتراك — راقب النتيجة في السجل' : 'تعذّر إعادة الاشتراك');
     runAll();
