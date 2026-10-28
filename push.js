@@ -9,6 +9,9 @@
   const APP_KEY = CFG.appKey || '';
   const VAPID_PUBLIC = CFG.vapidPublicKey || '';
   const VAPID_STORAGE_KEY = 'yt_vapid_public';
+  const LAST_REGISTER_KEY = 'yt_push_last_register';
+  const SW_RELOAD_KEY = 'yt_sw_reloaded';
+  const RE_REGISTER_INTERVAL = 12 * 60 * 60 * 1000; // 12 ساعة: تجديد الاشتراكات التي قد تموت
 
   function b64urlToBytes(s) {
     s = s.replace(/-/g, '+').replace(/_/g, '/');
@@ -159,12 +162,72 @@
     } catch (e) { return false; }
   }
 
+  // ===== تجديد تلقائي للاشتراك =====
+  // الهدف: ألا يضطر أي مستخدم لمسح بيانات المتصفح أو إعادة تثبيت التطبيق،
+  // حتى بعد تدوير مفتاح VAPID أو تحديث عامل الخدمة أو موت الاشتراك عند FCM.
+  function currentUsername() {
+    try {
+      const raw = localStorage.getItem('currentUser');
+      if (!raw) return null;
+      const u = JSON.parse(raw);
+      return (u && u.username) || null;
+    } catch (e) { return null; }
+  }
+
+  // force=true يتجاهل فترة الـ 12 ساعة (تستخدمه صفحة الفحص والزر اليدوي)
+  async function ensureSubscription(force) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return null;
+    const username = currentUsername();
+    if (!username) return null;
+    const last = Number(localStorage.getItem(LAST_REGISTER_KEY) || 0);
+    const keyChanged = localStorage.getItem(VAPID_STORAGE_KEY) !== VAPID_PUBLIC;
+    const due = (Date.now() - last) > RE_REGISTER_INTERVAL;
+    if (!force && !due && !keyChanged) return { skipped: true };
+    try {
+      const res = await subscribeAndSave(null, username);
+      if (res && res.registered !== false) {
+        localStorage.setItem(LAST_REGISTER_KEY, String(Date.now()));
+      }
+      return res;
+    } catch (e) {
+      console.warn('YTPush: فشل تجديد الاشتراك:', e);
+      return null;
+    }
+  }
+
+  if (typeof document !== 'undefined') {
+    const runEnsure = function () { setTimeout(function () { ensureSubscription(false); }, 1200); };
+    if (document.readyState === 'complete' || document.readyState === 'interactive') runEnsure();
+    else document.addEventListener('DOMContentLoaded', runEnsure);
+
+    // عند عودة المستخدم للتطبيق من الخلفية (مهم على الجوال)
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) ensureSubscription(false);
+    });
+    window.addEventListener('focus', function () { ensureSubscription(false); });
+
+    // تحديث الصفحة مرة واحدة فقط عند تفعيل عامل خدمة جديد،
+    // حتى تُحمّل النسخة الجديدة من config.js/push.js فوراً دون تدخل المستخدم.
+    if ('serviceWorker' in navigator) {
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (reloading) return;
+        try { if (sessionStorage.getItem(SW_RELOAD_KEY)) return; } catch (e) { /* خصوصية */ }
+        reloading = true;
+        try { sessionStorage.setItem(SW_RELOAD_KEY, '1'); } catch (e) { /* خصوصية */ }
+        window.location.reload();
+      });
+    }
+  }
+
   root.YTPush = {
     subscribeAndSave: subscribeAndSave,
     notifyUser: notifyUser,
     notifyAllDevices: notifyAllDevices,
     syncSchedule: syncSchedule,
     unsubscribeCurrent: unsubscribeCurrent,
-    getDeviceId: getDeviceId
+    getDeviceId: getDeviceId,
+    ensureSubscription: ensureSubscription
   };
 })(window);
