@@ -33,7 +33,7 @@ const APP_CONFIG = {
   supabasePush: {
     functionUrl: 'https://pyjjaekcqbdijcyloqvx.supabase.co/functions/v1/send-push',
     appKey: 'nXwGBUpmnw1fFr-r0sfYrgJU5RaFA1bc',
-    vapidPublicKey: 'BDWpEgXrrowDqNe2tHNGIdNmEI2hjNCK8GxQXQhUfpIPievRwMgJhq-ZUbUpeOcrRHrOofp6OSmBwVMSXGsxIZQ'
+    vapidPublicKey: 'BM9EBHzzcRkxzxUbwfJuR7A9Jcsi11Uc0GGi9YqX8dyzBqMRyJmZ9tCgzFSSYf2ffyBWnHwACd7t6VD7fuX5rI4'
   }
 };
 
